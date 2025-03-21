@@ -1,0 +1,246 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; setup procedure                     ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; This is the main setup procedure which can be triggered through the UI. It
+; processes the current configuration (specified through UI and possibly files)
+; and prepares a population for simulation. Time does not start running yet.
+; HUMATs do not yet have their visualization updated by design as their internal
+; state might be incomplete (with respect to the currently selected 
+; visualization) until the first tick is run. A manual visualization is possible
+to setup
+  ; determine population setup type (procedural/filebased)
+  ifelse (ui-toggle-procedural 
+    or (is-boolean? agent-file-path and not agent-file-path) 
+    or (is-number? agent-file-path and agent-file-path = 0))
+  [
+    set ui-toggle-procedural true
+    if ui-population-mode = "Filebased" [ set ui-population-mode "Biased" ]
+    Output-Print-Regular "Setting up simulation procedurally"
+    Setup-Procedurally
+  ]
+  ; setup the simulation from a file
+  [
+    set ui-toggle-procedural false
+    set ui-population-mode "Filebased"
+    Output-Print-Regular 
+      word "Setting up simulation based on file: " agent-file-path
+    Setup-File-Based
+  ]
+  ; if a campaign file is loaded, schedule the events
+  if ui-campaign-enabled [
+    Output-Print-Regular "Setting up campaign schedule"
+    Setup-Campaign
+    Setup-Critical-Node-Representations
+    Set-Initial-Critical-Node-Visualization
+  ]
+  ; if we failed to load an actual population, prevent the model from starting
+  if count humats = 0 [
+    set simulation-ready? false
+    error "Setup produced an empty population, please check the input"
+  ]
+end
+
+; Sets up the population based on the currently configured population file
+to Setup-File-Based
+  ; perform basic prep
+  Setup-Generic-Basis
+  
+  ; read the agents and validate them
+  let agents Read-Agent-File agent-file-path
+  ; should be false, can be toggled on for debugging purposes
+  ; if set to true, will log every incorrect agent in the file and not end setup
+  let with-warnings? false
+  Validate-Agent-Description-List agents with-warnings? 
+
+  ; create the population
+  Setup-Create-Population-From-List agents
+  
+  ; update the ui to match the number of agents
+  set ui-n-pop count humats
+
+  ; automatically up the convergence requirement for large populations
+  set GLOBAL-NUMBER-OF-STATES-FOR-CONVERGENCE (
+    ifelse-value ui-n-pop > 9999 [ 10 ] [ 5 ])
+
+  ; initializes the alter-representation lists of the agents given the network
+  Setup-Alter-Representations
+
+  ; allow the simulation to start
+  set simulation-ready? true
+
+  Output-Print-Verbose "Setup from file complete"
+  reset-ticks
+end
+
+; Sets up the population based on the currently configured setup procedure
+to Setup-Procedurally
+  ; clears the view and state and sets some globals
+  Setup-Generic-Basis
+
+  ; set the convergence metric depending on the number of agents
+  ; NOTE: bigger populations tend to change and converge slower
+  set GLOBAL-NUMBER-OF-STATES-FOR-CONVERGENCE (
+    ifelse-value ui-n-pop > 9999 [ 10 ] [ 5 ])
+  
+  ; the network generation also generates the agents and their positions
+  Setup-Network ui-n-pop
+  
+  ; give the humats attribute values
+  Setup-Humat-Attributes ui-n-pop
+
+  ; initializes the alter-representation lists of the agents given the network
+  Setup-Alter-Representations
+
+  ; allow the simulation to start
+  set simulation-ready? true
+
+  Output-Print-Verbose "Procedural setup complete"
+  reset-ticks
+end
+
+; Distributes the humats in the neighborhood and make them visible
+; NOTE: This assumes an initialized agent population to be present
+to Setup-Neighborhood-Random-Distance
+  ; Randomly distribute the agents in the view so we can see them
+  let MAX-DISTANCE 200
+  ask humats [ forward random MAX-DISTANCE ]
+end
+
+to Setup-Humat-Attributes [ n ]
+  ifelse ui-population-mode = "Randomized" [
+    ; randomized humats
+    ask humats [ Generate-Random-Household-Attributes n ]]
+  [ ; biased initialization
+    ask humats [ Generate-Biased-Household-Attributes n ]]
+end
+
+; Function that randomly initializes a network for the humats and initializes
+; their attributes procedurally (based on the current configuration).
+; The network used generated is a preferential attachment (Barabasi-Albert)
+; network with a minimal degree of 1 including all agents.
+to Setup-Generate-Random-Neighbor-Networks [ number-of-agents ]
+  let MIN-DEGREE 1
+  let number-of-links number-of-agents
+
+  ; (based on the NW General Examples model)
+  Initialize-Preferential-Network MIN-DEGREE number-of-agents
+
+  ; generate a layout using the radial algorithm
+  Layout-Neighbor-Networks
+end
+
+; Initializes the alter-representations of the humats.
+; The initialization looks at the network structure and (mostly) zero-
+; initializes the representations for those agents that are linked for each
+; humat when this function is called.
+to Setup-Alter-Representations
+  ask humats [
+    Initialize-Alter-Representation-List
+  ]
+end
+
+; Sets some global values intended to be constant.
+; This is to have named constants available that can be used in any 
+; procedure that needs them.
+; This routine doubles as a way of setting model parameters
+to Setup-Global-Constants
+  Set-Hardcoded-Global-Constants
+end
+
+; Performs generic setup (shared between modes)
+to Setup-Generic-Basis
+  ; we keep most globals but reset the simulation otherwise
+  clear-turtles
+  clear-links
+  clear-patches
+  clear-ticks
+  clear-drawing
+  clear-all-plots
+  time:clear-schedule
+  
+  ; Set patch color to white
+  ; TODO: find a different way to do this than in setup
+  ; NOTE: this is only set to make the UI easier on the eyes when running
+  ; with inverted window colors
+  ask patches [set pcolor white]
+  
+  ; close any files that are currently open
+  ; this should not occur in normal operation, but may if there is an error
+  file-close-all
+  
+  ; reset the convergence metric list
+  set global-convergence-metric-list []
+  set simulation-ready? false
+  
+  ; ensure that the global constant values are available and correct
+  Setup-Global-Constants
+  
+  ; prevent invalid input from the buttons
+  set ui-n-pop ifelse-value ui-n-pop < 2 [ 10 ] [ ui-n-pop ]
+
+  ; set the convergence margin
+  set GLOBAL-CONVERGENCE-EPSILON 0.001
+end
+
+; Reads the agent descriptions in the list and configures an agent population
+; including a social network where each agent corresponds to one of the items
+; in the list.
+; NOTE: Performs no input validation
+to Setup-Create-Population-From-List [ agent-description-list ]
+  ; populate the agents
+  let number-of-agents (length agent-description-list)
+  let number-of-links number-of-agents
+
+  Setup-Network number-of-agents
+
+  ; update each agent (in random order) using one of the descriptions
+  ask humats [
+    ; initialize this humat
+    Initialize-Humat-From-Description (item who agent-description-list)
+  ]
+end
+
+; Sets up the campaign schedule (procedurally or file-based)
+to Setup-Campaign
+  time:anchor-schedule time:create "2024-09-23" 1 "day"
+  ifelse campaign-file-enabled? [
+    Output-Print-Regular 
+      word "Loading campaign schedule from " campaign-file-path
+    Campaign-From-File campaign-file-path
+  ]
+  [ 
+    Output-Print-Regular "Setting default campaign schedule"
+    Procedural-Campaign
+  ]
+end
+
+; Creates an alter-representation for all humats for the critical nodes
+to Setup-Critical-Node-Representations
+  ; this makes it so all humats add a representation of each critical node
+  ask critical-nodes [
+    ; NOTE: myself refers to the critical-node that asks the humats
+    ask humats [ Add-Alter-Representation-For-Critical-Node myself ]
+  ]
+end
+
+; Generates a network based on the current settings
+to Setup-Network [ number-of-agents ]
+  ; generate a network
+  ; TODO: network load from file option
+  ; switch-case-esque
+  (ifelse
+    ui-network-type = "random" [
+      Initialize-Random-Network 0.01 number-of-agents ]
+    ui-network-type = "preferential"[
+      let MIN-DEGREE 1
+      Initialize-Preferential-Network MIN-DEGREE number-of-agents ]
+    ui-network-type = "small-world" [
+      let neighborhood-size min (list (0.1 * number-of-agents) 1)
+      let rewire-p 0.1
+      Initialize-Small-World number-of-agents neighborhood-size rewire-p ]
+  )
+
+  ; create the visual layout
+  Layout-Neighbor-Networks
+end

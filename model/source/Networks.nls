@@ -1,0 +1,40 @@
+; network links
+undirected-link-breed [humat-neighbors humat-neighbor]
+
+; Generates a layout of the agent network (using the spring layout algorithm)
+to Layout-Neighbor-Networks
+  Layout-Neighbor-Networks-Radial
+end
+
+to Layout-Neighbor-Networks-Radial
+  let root-agent max-one-of humats [ count my-links ]
+  layout-radial humats links root-agent
+end
+
+; Generates a layout for the neighbors using the spring algorithm
+; NOTE: the parameters do not produce satisfactory results, avoid procedure
+to Layout-Neighbor-Networks-Spring
+  ; generate a layout using the spring algorithm 
+  ; (based on the NW General Examples model)
+  let rootcount sqrt count humats
+  let scale-factor (ifelse-value rootcount = 0 [ 1 ] [ rootcount ])
+  ; link the network spread to the size of the view
+  let spring-length (4 * Report-Minimum-View-Bound)
+  let repulsion-constant (spring-length * 2)
+  let tautness 1.0
+  repeat 100 [ layout-spring humats humat-neighbors (tautness / scale-factor) (spring-length / scale-factor) (repulsion-constant / scale-factor) ]
+end
+
+; Preferential attachment style network
+to Initialize-Preferential-Network [min-degree n]
+  nw:generate-preferential-attachment humats humat-neighbors n min-degree
+end
+
+; Erdos-Renyi random network
+to Initialize-Random-Network [ probability n ]
+  nw:generate-random humats humat-neighbors n probability
+end
+
+to Initialize-Small-World [ neighborhood-size p-rewire n ]
+  nw:generate-watts-strogatz humats humat-neighbors neighborhood-size p-rewire n
+end

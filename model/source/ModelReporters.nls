@@ -1,0 +1,54 @@
+; Reports percentage of population opting in (selecting "A")
+to-report Opt-In-Percentage-Population
+  report ((count humats with [current-alternative = "A"] / count humats )* 100)
+end
+
+; Reports percentage of population in a social dilemma
+to-report Social-Dilemma-Percentage-Population
+  report (
+    count humats with [
+      dilemma-status = "social" or dilemma-status = "both"]
+    / count humats * 100)
+end
+
+; Reports percentage of population in a non-social dilemma
+to-report Non-Social-Dilemma-Percentage-Population
+  report (
+    count humats with [
+      dilemma-status = "non-social" or dilemma-status = "both"]
+    / count humats * 100)
+end
+
+; Reports the current metrics that can be used to measure convergence
+to-report Compute-Convergence-Metric
+ report (list 
+      Opt-In-Percentage-Population 
+      Social-Dilemma-Percentage-Population
+      Non-Social-Dilemma-Percentage-Population
+      ; these are experiment reporters (defined elsewhere)
+      Average-Population-Evaluation
+      Average-Population-Expected-Satisfaction
+      (Non-Dilemma-Count / count humats)
+      )
+end
+
+; Reports true if the convergence metrics compare equal
+to-report Equal-Convergence-Metrics? [ lhs rhs ]
+  ; set an acceptable margin depending on the number of agents (more agents 
+  ; equals more margin as they tend to settle slower)
+  let margin GLOBAL-CONVERGENCE-EPSILON
+  
+  foreach range length rhs [
+    index ->
+    let difference abs (item index lhs - item index rhs)
+    if difference > margin [
+      report false
+    ]
+  ]
+  report true
+end
+
+; Reports the view port bound minimum (of both the x/y coordinates)
+to-report Report-Minimum-View-Bound
+  report (min (list max-pxcor max-pycor))
+end

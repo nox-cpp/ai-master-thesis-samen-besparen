@@ -1,0 +1,125 @@
+;; This file contains procedures that can read input files and initialize the simulation accordingly
+
+; Reads the agent file and reports the result as a list of agent descriptions
+to-report Read-Agent-File [ path-to-file ]
+  ; simply read the file as a csv and report all but the first line
+  report but-first csv:from-file path-to-file
+end
+
+; Reads a list of agent descriptions and validates it in the current model context
+; If with-warnings? evaluates to true, agents that don't match the expected 
+; specifications are skipped but a warning is logged.
+; If with-warnings? evaluates to false, the processing is terminated when an
+; agent is encountered that is out-of-spec and an error is reported.
+to Validate-Agent-Description-List [ list-of-agents with-warnings? ]
+  (foreach list-of-agents [
+    description ->
+    if not Valid-Agent-Description? description [
+      Output-Print-Regular (
+          sentence "One or more agents in the file were invalid. Please"
+          " validate the input file. NOTE: Trailing/leading whitespace may"
+          " invalidate numerical data.")
+      ifelse with-warnings? [
+        Output-Print-Regular sentence "Invalid agent in input data: " description
+      ]
+      ; error, quit
+      [
+        error sentence "Invalid agent in input data: " description
+      ]
+    ]
+  ])
+  Output-Print-Regular "Succesfully read agent input file"
+end
+
+; Reports true if the description is valid, false otherwise
+to-report Valid-Agent-Description? [ description ]
+  let EXPECTED-MOTIVE-COUNT NUMBER-OF-MOTIVES-PARAMETER
+  let POSSIBLE-ALTERNATIVES GLOBAL-ALTERNATIVES
+  let DISSONANCE-ITEM 1
+  let ASPIRATION-ITEM 2
+  let ALTERNATIVE-DESCRIPTION-ITEM 3
+  let MOTIVE-COUNT-ITEM 4
+  let NUMBER-OF-FIXED-COLUMNS 5
+  let NUMBER-OF-COLUMNS-PER-MOTIVE 3
+  if not is-string? first description [
+    Output-Print-Verbose "Invalid agent id"
+    report false
+  ]
+  if not Valid-Number-In-Range? (item DISSONANCE-ITEM description) 0 1 [
+    Output-Print-Verbose "Invalid dissonance"
+    report false
+  ]
+  if not Valid-Number-In-Range? (item ASPIRATION-ITEM description) 0 1 [
+    Output-Print-Verbose "Invalid aspiration"
+    report false
+  ]
+  if not member? 
+    (item ALTERNATIVE-DESCRIPTION-ITEM description)
+    POSSIBLE-ALTERNATIVES  [
+    Output-Print-Verbose "Invalid alternative"
+    report false   
+  ]
+  if not is-number? (item MOTIVE-COUNT-ITEM description) [ 
+    Output-Print-Verbose "Invalid motive-count"
+    report false
+  ]
+  if not ((item MOTIVE-COUNT-ITEM description) = EXPECTED-MOTIVE-COUNT) [
+    Output-Print-Verbose "Number of motives in file does not match environment"
+    report false
+  ] 
+  let field-count 
+    NUMBER-OF-FIXED-COLUMNS + NUMBER-OF-COLUMNS-PER-MOTIVE * EXPECTED-MOTIVE-COUNT
+  if not (length description = field-count) [
+    Output-Print-Verbose "Invalid number of (motive related) fields"
+    Output-Print-Verbose (sentence "Actual vs. expected " length description "/" field-count)
+    report false
+  ]
+  ; check if all motive importances are in a valid range [0, 1]
+  let first-satisfaction-field NUMBER-OF-FIXED-COLUMNS + EXPECTED-MOTIVE-COUNT
+  if not (reduce and 
+    (map 
+      [ value -> Valid-Number-In-Range? value 0 1 ]
+      sublist description NUMBER-OF-FIXED-COLUMNS first-satisfaction-field)) [
+    Output-Print-Verbose "Motive importance field with out of range value"
+    report false 
+  ]
+  ; check if the motive satisfaction values are in a valid range [-1, 1]
+  if not (reduce and
+    (map 
+      [ value -> Valid-Number-In-Range? value -1 1 ]
+      sublist description 
+        (first-satisfaction-field)
+        (field-count))) [
+    Output-Print-Verbose "Motive satisfaction field with out of range value"
+    report false
+  ]
+
+  ; all checks pass
+  report true
+end
+
+; Reports if the value is a number and in the (inclusive) range
+to-report Valid-Number-In-Range? [ value range-start range-end ]
+  report is-number? value and value <= range-end and value >= range-start
+end
+
+; Reads the next line from the currently opened path and reports it as a node spec
+to-report Critical-Node-Specs-From-File [ file-path ]
+  report csv:from-row file-read-line
+end
+
+to-report Is-Positive-Number? [ input ]
+  report is-number? input and input > 0
+end
+
+; Reports if the event specification is valid
+to-report Valid-Event-Spec? [ event-spec ]
+  ; we need a name
+  report is-string? item EVENT-NAME-ITEM event-spec
+    ; a non-negative time (in ticks)
+    and Is-Positive-Number? item TICK-ITEM event-spec
+    ; a non-negative reach
+    and Is-Positive-Number? item REACH-ITEM event-spec
+    ; and a strength in the right range
+    and Valid-Number-In-Range? item STRENGTH-ITEM event-spec 0 1
+end

@@ -1,0 +1,107 @@
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; Humat - Cognition ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+; Last step of HUMAT action process. Updates their current dilemma state and
+; sets the other dynamic attributes
+to Update-Humat  
+  ; update the currently selected alternative
+  set current-alternative Select-Preferred-Alternative
+
+  ; update the (remaining) dynamic humat attributes
+  ; TODO: check if this naming still makes sense
+  Update-Satisfaction-And-Disonnance
+
+  ; update the expected satisfaction (mostly for reporting)
+  Update-Expected-Satisfaction
+
+  ; resolve dilemma state
+  set dilemma-status Determine-Dilemma-Status
+end
+
+; Updates the dynamic attributes for a HUMAT based on the current world state
+to Update-Satisfaction-And-Disonnance
+  ; social satisfaction is calculated every tick as it depends on the HUMATs
+  ; social environment, which may change
+  Update-Social-Satisfaction
+  
+  ; update to reflect the satisfaction from the currently selected alternative
+  set overall-evaluation (Calculate-Evaluation current-alternative)
+
+  ; update the disonnance values
+  set dissonance-value-a (Calculate-Dissonance "A")
+  set dissonance-value-b (Calculate-Dissonance "B")
+end
+
+; Calculates the social satisfaction of both alternatives and updates the HUMAT
+; fields associated with it
+to Update-Social-Satisfaction
+  ; alternative A
+  ; social satisfaction stored in motive-satisfaction list in the first index
+  set motive-satisfaction-a-list 
+    replace-item 0 motive-satisfaction-a-list Calculate-Social-Satisfaction "A"
+
+  ; social satisfaction stored in motive-satisfaction list in the first index
+  set motive-satisfaction-b-list 
+    replace-item 0 motive-satisfaction-b-list Calculate-Social-Satisfaction "B"
+end
+
+; Reports the preferred alternative of the HUMAT
+to-report Select-Preferred-Alternative
+  let local-satisfaction-a (Calculate-Evaluation "A")
+  let local-satisfaction-b (Calculate-Evaluation "B")
+  
+  ; minimal difference is 10% of the numerical range of satisfaction
+  let MINIMAL-DIFFERENCE 0.2
+
+  ; check if the difference between values is sufficiently large
+  let difference abs(local-satisfaction-a - local-satisfaction-b)
+  if difference < MINIMAL-DIFFERENCE [
+    ; in case of a tie, select the least dissonant
+    report Select-Least-Dissonant-Alternative
+  ]
+
+  ; preference towards a
+  if local-satisfaction-a > local-satisfaction-b [report "A"]
+  
+  ; preference towards b
+  if local-satisfaction-a < local-satisfaction-b [report "B"]
+end
+
+; Reports the alternative that has the lowest dissonance value for the HUMAT
+to-report Select-Least-Dissonant-Alternative
+  let local-dissonance-a (Calculate-Dissonance "A")
+  let local-dissonance-b (Calculate-Dissonance "B")
+
+  ; minimal difference is 10% of the numerical range of dissonance
+  let MINIMAL-DIFFERENCE 0.1
+
+  ; check if the difference between values is sufficiently large
+  let difference abs(local-dissonance-a - local-dissonance-b)
+  if difference < MINIMAL-DIFFERENCE [
+    ; in case of a tie, keep the current alternative
+    report current-alternative
+  ]
+
+  ; preference towards a
+  if local-dissonance-a < local-dissonance-b [report "A"]
+  
+  ; preference towards b
+  if local-dissonance-a > local-dissonance-b [report "B"]
+end
+
+; convenience reporter to get the social satisfaction
+to-report Social-Evaluation [ alternative ]
+  report Calculate-Evaluation-X 0 alternative
+end
+
+; reports the dissonance the humat experiences with respect to its current alternative
+to-report Current-Dissonance
+  report (ifelse-value current-alternative = "A" [ dissonance-value-a ] [ dissonance-value-b ])
+end
+
+; update the expected satisfaction values
+to Update-Expected-Satisfaction
+  set expected-satisfaction-a Expected-Satisfaction-For-Alternative "A"
+  set expected-satisfaction-b Expected-Satisfaction-For-Alternative "B"
+end

@@ -1,0 +1,278 @@
+; Procedure that randomly generates dummy humats for testing purposes
+; NOTE: This is not used if random network initialization is used as that will
+; generate the humats
+to Generate-Dummy-Population [number-of-agents]
+  create-humats number-of-agents [    
+    Generate-Random-Household-Attributes number-of-agents
+    ; check if the household attributes are valid or ends the generation
+    Validate-Humat-Attributes-Or-Exit
+  ]
+end
+
+; The number of agents in the simulation is used to determine some of the individual
+; agent attributes
+to Generate-Random-Household-Attributes [ number-of-agents ]
+  Generate-Base-Attributes number-of-agents
+  Generate-Randomized-Static-Humat-Attributes
+  Initialize-Randomized-Dynamic-Humat-Attributes
+  Initialize-Shape-Attributes
+  Initialize-Communication-Attributes
+end
+
+; Generates an agent with biased attributes.
+; Attributes are selected such that: 
+; - Opting out (B) is initially selected
+; - Opting in comes with generally greater comfort
+; - Value importance/satisfaction is mirrored and centered around 0
+; - Opting out comes with generally financial gains
+to Generate-Biased-Household-Attributes [ number-of-agents ]
+  ; base attributes are not used in calculations so set to default for now
+  Generate-Base-Attributes number-of-agents
+  ; static humat attributes are biased
+  Generate-Biased-Static-Humat-Attributes
+  ; dynamic attributes (including satisfactions) are biased
+  Initialize-Biased-Dynamic-Humat-Attributes
+  Initialize-Shape-Attributes
+  Initialize-Communication-Attributes
+end
+
+to Generate-Base-Attributes [ number-of-agents ]
+  ; not guaranteed to be unique
+  set id-in-dataset (random number-of-agents)
+end
+
+to Generate-Randomized-Static-Humat-Attributes
+  let MAX-DISONNANCE 1.0
+  let MAX-IMPORTANCE 1.0
+  let MAX-ASPIRATION 1.0
+  
+  ; motive count is a model parameter and for the current model it is set to 4
+  set motive-count 4
+
+  ; initialize all importance to random values
+  let IMPORTANCE-PRECISION 3
+  set importance-list (list
+    precision random-float MAX-IMPORTANCE IMPORTANCE-PRECISION
+    precision random-float MAX-IMPORTANCE IMPORTANCE-PRECISION
+    precision random-float MAX-IMPORTANCE IMPORTANCE-PRECISION
+    precision random-float MAX-IMPORTANCE IMPORTANCE-PRECISION)
+
+  ; calculate the sum importance
+  set importance-sum (sum importance-list)
+
+  ; set the dissonance tolerance to a random value
+  set dissonance-tolerance 
+    precision random-float MAX-DISONNANCE IMPORTANCE-PRECISION
+
+  ; set an aspiration for the HUMAT
+  set aspiration-level 
+    precision random-float MAX-ASPIRATION IMPORTANCE-PRECISION
+end
+
+; Importances are randomized using a normal distribution centered around the
+; middle value (0.5) for all needs except the social need, which is biased lower
+to Generate-Biased-Static-Humat-Attributes
+  ; motive-count is a model parameter
+  set motive-count NUMBER-OF-MOTIVES-PARAMETER
+
+  let MAX-DISONNANCE 1.0
+  let MAX-IMPORTANCE 1.0
+  let MAX-ASPIRATION 1.0
+  let INITIAL-SOCIAL-SATISFACTION 0.0
+
+  ; initialize all importance to random values
+  let GENERAL-PRECISION 3
+  set importance-list (list
+    precision Random-Normal-Trunc 0.1 0.14 0 1 GENERAL-PRECISION
+    precision Random-Normal-Trunc 0.5 0.14 0 1 GENERAL-PRECISION
+    precision Random-Normal-Trunc 0.5 0.14 0 1 GENERAL-PRECISION
+    precision Random-Normal-Trunc 0.5 0.14 0 1 GENERAL-PRECISION)
+
+  ; calculate the sum importance
+  set importance-sum (sum importance-list)
+
+  ; set the dissonance tolerance to a normal value
+  set dissonance-tolerance 
+    precision Random-Normal-Trunc 0.5 0.14 0 1 GENERAL-PRECISION
+
+  ; set an aspiration for the HUMAT
+  set aspiration-level 
+    precision Random-Normal-Trunc 0.5 0.14 0 1 GENERAL-PRECISION
+end
+
+to-report Passes-Sanity-Check?
+  ; sanity check
+  report length importance-list != motive-count
+end
+
+to-report Valid-Humat-Description
+  report Passes-Sanity-Check?
+end
+
+; Checks if the humats attributes are valid, exits otherwise
+to Validate-Humat-Attributes-Or-Exit
+  ; first perform the check, if it's fine, exit.
+  if Valid-Humat-Description [ stop ]
+
+  ; invalid HUMAT, provide feedback
+  ; check if the household attributes are valid
+  if not Passes-Sanity-Check? [ 
+    Output-Print-Regular "motive count parameter does not match counted motives"
+    error "critical error, exiting" ]
+end
+
+to Initialize-Randomized-Dynamic-Humat-Attributes
+  ; initialization constants
+  let SATISFACTIONS [-1.0 1.0]
+  let NO-DILEMMA GLOBAL-NO-DILEMMA
+  
+  ; randomly select an alternative
+  set current-alternative one-of GLOBAL-ALTERNATIVES
+  
+  ; initialize the motive satisfactions
+  ; motives are set to a random float in [-1,1]
+  let SATISFACTION-PRECISION MOTIVE-PRECISION
+  let MAX-SATISFACTION 1.0
+  set motive-satisfaction-a-list 
+    map 
+      [one-of SATISFACTIONS * (precision (random-float MAX-SATISFACTION) SATISFACTION-PRECISION) ] 
+      range motive-count
+  set motive-satisfaction-b-list 
+    map 
+      [one-of SATISFACTIONS * (precision (random-float MAX-SATISFACTION) SATISFACTION-PRECISION) ] 
+      range motive-count
+
+  ; initialize agents without dilemmas  
+  set dilemma-status NO-DILEMMA
+end
+
+; Attributes are initialized such that: 
+; - Opting out (B) is initially selected
+; - Opting in comes with generally greater comfort
+; - Value importance/satisfaction is mirrored and centered around 0
+; - Opting out comes with generally financial gains
+to Initialize-Biased-Dynamic-Humat-Attributes
+  ; opt-out initially for all agents
+  set current-alternative GLOBAL-OPT-OUT-ALTERNATIVE
+  
+  ; initialize the motive satisfactions
+  ; motives are set to a random float in [-1,1]
+  let SATISFACTION-PRECISION MOTIVE-PRECISION
+  let MAX-SATISFACTION 1.0
+  let UNINITIALIZED-NUMBER 0
+
+  let FINANCIAL-OPT-IN [ -0.75 -0.50 -0.25 ]
+
+  ; implement the biased satisfactions
+  set motive-satisfaction-a-list (list
+    ; social (uninitialized)
+    (precision UNINITIALIZED-NUMBER MOTIVE-PRECISION)
+    ; financial motive (biased against opting in)
+    (precision Random-Normal-Trunc -0.5 0.14 -1 1 MOTIVE-PRECISION)
+    ; comfort (normally distributed, biased positive)
+    (precision Random-Normal-Trunc 0.5 0.14 -1 1 MOTIVE-PRECISION)
+    ; climate (normally distributed, around 0)
+    (precision Random-Normal-Trunc 0.0 0.20 -1 1 MOTIVE-PRECISION)
+  ) 
+    
+  set motive-satisfaction-b-list (list
+    ; social (uninitialized)
+    (precision UNINITIALIZED-NUMBER MOTIVE-PRECISION)
+    ; financial motive (biased against opting in)
+    (precision 
+      (abs item FINANCIAL-MOTIVE-ITEM motive-satisfaction-a-list)
+      MOTIVE-PRECISION)
+    ; comfort (normally distributed, biased positive)
+    (precision Random-Normal-Trunc 0.75 0.14 -1 1 MOTIVE-PRECISION)
+    ; climate (normally distributed, around 0, mirrored)
+    (precision 
+      (0.0 - item CLIMATE-MOTIVE-ITEM motive-satisfaction-a-list)
+      MOTIVE-PRECISION)
+  )
+
+  ; initialize agents without dilemmas  
+  set dilemma-status GLOBAL-NO-DILEMMA
+end
+
+to Initialize-Shape-Attributes
+  ; Set their shape to something we can see
+  set size 10
+  set shape "circle"
+end
+
+; (zero-)initializes the attributes associated with the HUMAT communication
+to Initialize-Communication-Attributes
+  ; lists of alter representations
+  ; all alters linked in the network
+  set alter-representation-list []
+  
+  ; the number of times humat inquired with alters
+  set #inquiring 0 
+  ; the number of times humat was inquired with by egos
+  set #inquired  0 
+  ; the number of times humat signaled to alters
+  set #signaling 0
+  ; the number of times humat was signaled to
+  set #signaled 0
+  ; boolean positive [1] if the ego is inquiring at a given tick
+  set inquiring? GLOBAL-BOOLEAN-FALSE
+  ; boolean positive [1] if the ego is signaling at a given tick
+  set signaling? GLOBAL-BOOLEAN-FALSE 
+end
+
+; Updates/initializes an agent based on the given agent description
+; Agent descriptions can be obtained by reading them from a file and have a
+; fixed syntax specification (see report notes for details)
+to Initialize-Humat-From-Description [ agent-description ]
+  ; indices of the breed attribute values in the description list
+  let DISSONANCE-TOLERANCE-ITEM 1
+  set dissonance-tolerance item DISSONANCE-TOLERANCE-ITEM agent-description
+  Initialize-Generic-Agent-Attributes-From-Description agent-description
+  Initialize-Shape-Attributes
+  Initialize-Communication-Attributes
+end
+
+; Critical nodes have attributes that deviate from the regular agent, so they get their own function
+to Initialize-Critical-Node-From-Description [ node-description ]
+  Initialize-Generic-Agent-Attributes-From-Description node-description
+end
+
+; Sets most of the fields required for HUMAT-related agents
+to Initialize-Generic-Agent-Attributes-From-Description [ agent-description ]
+  ; indices of the breed attribute values
+  let AGENT-ID-ITEM 0
+  let IMPORTANCE-START-ITEM 5
+  let IMPORTANCE-END-ITEM 8
+  let ASPIRATION-LEVEL-ITEM 2
+  let MOTIVE-COUNT-ITEM 4
+  let CURRENT-ALTERNATIVE-ITEM 3
+  let MOTIVE-SATISFACTION-A-LIST-START-ITEM 9
+  let MOTIVE-SATISFACTION-B-LIST-START-ITEM 10
+
+  ; read the static items
+  set id-in-dataset item AGENT-ID-ITEM agent-description
+  set importance-list (
+    sublist agent-description IMPORTANCE-START-ITEM (IMPORTANCE-END-ITEM + 1))
+    set aspiration-level (item ASPIRATION-LEVEL-ITEM agent-description)
+  set motive-count (item MOTIVE-COUNT-ITEM agent-description)
+  ; calculate the sum importance
+  set importance-sum (sum importance-list)
+
+  ; read the dynamic items (they are interleaved)
+  set motive-satisfaction-a-list []
+  set motive-satisfaction-b-list []
+  foreach range motive-count [
+    motive-index ->
+    set motive-satisfaction-a-list lput 
+      (item 
+        (MOTIVE-SATISFACTION-A-LIST-START-ITEM + motive-index * 2)
+        agent-description)
+      motive-satisfaction-a-list
+    set motive-satisfaction-b-list lput 
+      (item 
+        (MOTIVE-SATISFACTION-B-LIST-START-ITEM + motive-index * 2)
+        agent-description)
+      motive-satisfaction-b-list
+  ]
+  set current-alternative (item CURRENT-ALTERNATIVE-ITEM agent-description)
+end

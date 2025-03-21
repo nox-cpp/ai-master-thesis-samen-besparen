@@ -1,0 +1,9 @@
+.lintr
+# netlogo temp
+model/.Grunneger Power.tmp.nlogo
+.env
+r_package/
+.Rhistory
+experiments/netlogo_templates/generated/*
+*.pdf
+*.html

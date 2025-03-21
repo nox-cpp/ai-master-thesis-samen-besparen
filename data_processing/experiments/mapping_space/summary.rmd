@@ -1,0 +1,87 @@
+Setup code block
+
+```{r}
+# first, make sure that we are in the correct environment to run the script
+script_env <- Sys.getenv("GP_SCRIPT_FOLDER")
+if (nchar(script_env) == 0 && !file.exists("environment_setup.r")) {
+    stop(
+        paste0(
+            "To run this script please navigate to the directory that ",
+            "contains 'environment_setup.r' or set the GP_SCRIPT_FOLDER environment",
+            "variable"
+        )
+    )
+    # load the environment setters
+} else if (script_env == "") {
+    # check for the local directory
+    source(file.path("environment_setup.r"))
+} else {
+    source(file.path(script_env, "environment_setup.r"))
+}
+
+load_lib_quietly("dplyr")
+load_lib_quietly("ggplot2")
+load_lib_quietly("gridExtra") # grid plots
+
+# make sure we have a proper environment for this script
+load_environment_if_necessary()
+script_dir <- Sys.getenv("GP_SCRIPT_FOLDER")
+output_dir <- Sys.getenv("GP_OUTPUT_DATA_FOLDER")
+data_dir <- Sys.getenv("GP_INPUT_DATA_FOLDER")
+figure_dir <- Sys.getenv("GP_PLOTTING_FOLDER")
+
+# load the required functions
+source(file.path(script_dir, "behaviourspace_helpers.r"))
+source(file.path(script_dir, "experiment_helpers.r"))
+source(file.path(script_dir, "gp_data_read.r"))
+
+# used in file/folder creation
+experiment_name <- "mapping_space"
+
+```
+
+Load the data and subset it
+
+```{r}
+# load the data into a table
+experiment_dir <- file.path(output_dir, "experiments", experiment_name)
+data_path <- file.path(experiment_dir, paste0(experiment_name, ".csv"))
+
+# get the behavior space data (and enrich it)
+bspace$pop_name <- pop_name(read_behaviourspace_data(data_path))
+
+# get the final opt-ins per group
+optins <- subset_run_ends(bspace)
+
+# add the importance mapping parameters to the dataset and subset the experiment data
+importance_space <- bspace |> filter(grepl("imp_map", pop_name)) |> decode_imp_setup()
+importance_ends <- subset_run_ends
+
+```
+
+The following two plots show the average opt-in counts over time for the different importance distribution experiment conditions.
+
+```{r}
+# Comparing the opt-in counts across the importance mean conditions
+grid.arrange(
+  importance_space |> optin_count_plot_base() + geom_smooth() + aes(colour = mu_f),
+  importance_space |> optin_count_plot_base() + geom_smooth() + aes(colour = mu_c),
+  importance_space |> optin_count_plot_base() + geom_smooth() + aes(colour = mu_v),
+  importance_space |> optin_count_plot_base() + geom_smooth() + aes(colour = mu_s),
+  ncol=2
+)
+
+# Comparing the opt-in counts across the importance standard deviation conditions
+grid.arrange(
+  importance_space |> optin_count_plot_base() + geom_smooth() + aes(colour = sig_f),
+  importance_space |> optin_count_plot_base() + geom_smooth() + aes(colour = sig_c),
+  importance_space |> optin_count_plot_base() + geom_smooth() + aes(colour = sig_v),
+  importance_space |> optin_count_plot_base() + geom_smooth() + aes(colour = sig_s),
+  ncol=2
+)
+
+```
+
+What can be observed here is that in general the financial and comfort motives contribute positively to the opt-in count in the high importance scenario and the value and social motive contribute negatively to the opt-in count in the importance scenario. This is somewhat unexpected as the mappings tend to favor opting out. This could be explained however if the dwelling factor in the base population tends towards lower dwelling factors and lack of pre-existing sustainable interventions.
+
+What is generally odd is that the opt-in counts seem to fluctuate between extremes over time, suggesting that the population as a whole shifts its opinion. We verify this by looking at sample run data.

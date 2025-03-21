@@ -1,0 +1,369 @@
+; Based on the current network context this will initialize the 
+; alter-representation lists for all humats.
+; Uses dynamically sized lists instead of individual entries for all motive
+; related attributes.
+; Humat-oriented
+to Initialize-Alter-Representation-List
+  ; create alter representation lists for each alter
+  ; to do:if behaviours unobservable - here add the guessing parameter
+  foreach sort link-neighbors [x ->
+    ; generate the representation for the given link
+    let working-list (Initialize-Alter-Representation-Of-Link x)
+    ; append the representation to the list
+    set alter-representation-list lput working-list alter-representation-list
+  ]
+end
+
+; Creates a representation list for the given alter-link
+to-report Initialize-Alter-Representation-Of-Link [ alter-link ]
+  ; try to guess the alter's selected alternative (biased)
+  let guessed-alternative-alter (
+    Alter-Guess-Behaviour? ([ current-alternative ] of alter-link))
+  
+  ; generate the alter representation structure using the guessed alternative
+  report Initialize-Alter-Representation
+   ([ who ] of alter-link) guessed-alternative-alter
+end
+
+; Reports the updated representation given an alter and the current representation
+to-report Updated-Alter-Representation-When-Signaled [ alter current-representation ]
+  ; pre-compute values used multiple times
+  ; motive similarities
+  let motive-similarity-a-list (Motive-Similarity-List self alter "A")
+  let motive-similarity-b-list (Motive-Similarity-List self alter "B")
+
+  ; signaling persuasion
+  let relative-aspiration 
+    Calculate-Relative-Aspiration [ aspiration-level ] of alter aspiration-level
+  let signal-persuasion-a-list map 
+      [similarity -> similarity * relative-aspiration]
+      (motive-similarity-a-list)
+  let signal-persuasion-b-list map 
+      [similarity -> similarity * relative-aspiration]
+      (motive-similarity-b-list)
+
+  
+  let updated-representation (list
+    ; item 0
+    [ who ] of alter
+    ; item 1 inquired?: stays the same
+    item INQUIRED?-ITEM current-representation
+    ; item 2 signaled?: stays the same
+    item SIGNALED?-ITEM current-representation
+    ; item 3 behaviour: signaled
+    [ current-alternative ] of alter
+    ; item 4 correct-guess?: computed 
+    Same-Alternatives? current-alternative [ current-alternative ] of alter
+    ; item 5 [motive-importances-list] of alter-link
+    [ importance-list ] of alter
+    ; item 6 [motive-satisfaction-a-list] of alter-link
+    [ motive-satisfaction-a-list ] of alter
+    ; item 7 [motive-satisfaction-b-list] of alter-link
+    [ motive-satisfaction-b-list ] of alter
+    ; item 8 [motive-similarity-a-list] of alter-link
+    ; similarity between the importance of needs
+    ; only > 0 if the given BA satisfies that group of needs in a similar
+    ; direction for the alter and for the ego
+    motive-similarity-a-list
+    ; item 9 [motive-similarity-b-list] of alter-link
+    ; similarity between the importance of needs
+    ; only > 0 if the given BA satisfies that group of needs in a similar
+    ; direction for the alter and for the ego
+    motive-similarity-b-list
+    ; item 10 relative-aspiration-influenced-ego: stays the same
+    ; relative social appeal/status (aspiration characteristic) in case of inquiring
+    item RELATIVE-ASPIRATION-INQUIRING-ITEM current-representation
+    ; item 11 relative-aspiration-influenced-alter: stays the same
+    ; relative social appeal/status (aspiration characteristic) in case of signaling
+    relative-aspiration
+    ; item 12 [ inquiring-persuasion-A-motive ]: stays the same
+    item INQUIRING-PERSUASION-A-LIST-ITEM current-representation
+    ; item 13 [ inquiring-persuasion-B-motive ]: stays the same
+    item INQUIRING-PERSUASION-B-LIST-ITEM current-representation
+    ; item 14 [ signaling-persuasion-A-motive ]: computed
+    signal-persuasion-a-list
+    ; item 15 [ signaling-persuasion-B-motive ]: computed
+    signal-persuasion-b-list
+    ; item 16 [ inquiring-persuasion ]: stays the same
+    item INQUIRING-PERSUASION-ITEM current-representation
+    ; item 17 [ signaling-persuasion ]: computed
+    ; the summed ability of this alter to persuade us when signaling
+    (
+      reduce + (signal-persuasion-a-list)
+      +
+      reduce + (signal-persuasion-b-list)
+    )
+  )
+  report updated-representation
+end
+
+; Reports a parially updated representation given an alter and the current 
+; representation for when signaling.
+; This is to implement the partial information that an ego receives when
+; signaling an alter
+to-report Updated-Alter-Representation-When-Signaling [ alter current-representation ]
+  ; maybe unneccessary to make a copy here but just in case
+  let new-representation current-representation
+
+  ; update signaled status
+  set new-representation 
+    replace-item SIGNALED?-ITEM new-representation GLOBAL-BOOLEAN-TRUE
+
+  ; update the selected alternative of the alter
+  set new-representation 
+    replace-item ALTERNATIVE-ITEM new-representation 
+      [current-alternative] of alter
+
+  ; update selection-comparison
+  set new-representation 
+    replace-item SAME?-ITEM new-representation 
+      (Same-Alternatives? current-alternative [current-alternative] of alter)
+
+  ; we need to get the alter's representation of this humat
+  let ego self
+  let ego-representation-alter [
+    Find-Alter-Representation ego alter-representation-list] of alter
+  
+  ; compute and update the gullibility of the alter
+  ; gullibility (the willingness of alter to be persuaded by the ego)
+  ; is stored in ego's representation of alter and is used later for sorting the
+  ; signaling-list. It is defined as the sum of signaling pursuasion for all 
+  ; motives and all alternatives
+  set new-representation 
+    replace-item SIGNALING-PERSUASION-ITEM new-representation (
+      ; summed persuasion of EGO for ALTER for A
+      reduce + (item SIGNAL-PERSUASION-A-ITEM ego-representation-alter)
+      +
+      ; summed persuasion of EGO for ALTER for B
+      reduce + (item SIGNAL-PERSUASION-B-ITEM ego-representation-alter)
+    )
+  
+  ; report the updated representation
+  report new-representation
+end
+
+; Reports a partially updated representation given an alter and the current
+; representation for when inquired with.
+to-report Updated-Alter-Representation-When-Inquired [ alter current-representation ]
+  ; maybe unneccessary to make a copy here but just in case
+  let new-representation current-representation
+
+  ; update selected alternative
+  set new-representation 
+    replace-item ALTERNATIVE-ITEM new-representation 
+      [current-alternative] of alter
+
+  ; update selection-comparison
+  set new-representation 
+    replace-item SAME?-ITEM new-representation 
+      (Same-Alternatives? current-alternative [current-alternative] of alter)
+
+  report new-representation
+end
+
+; Reports a parially updated representation given an alter and the current 
+; representation.
+; This is to implement the partial information that an ego receives when
+; inquiring with an alter
+to-report Updated-Alter-Representation-When-Inquiring [ alter current-representation ]
+  ; maybe unneccessary to make a copy here but just in case
+  let new-representation current-representation
+
+  ; update inquired status
+  set new-representation 
+    replace-item INQUIRED?-ITEM new-representation GLOBAL-BOOLEAN-TRUE
+
+  ; calculate motive similarities
+  let motive-similarities-a Motive-Similarity-List self alter "A"
+  let motive-similarities-b Motive-Similarity-List self alter "B"
+
+  ; calculat the aspiration factor
+  let relative-aspiration
+    Calculate-Relative-Aspiration [ aspiration-level ] of alter aspiration-level
+  
+  ; these items follow each other so we update in one go
+  let new-satisfaction-items (list
+    [ motive-satisfaction-a-list ] of alter
+    [ motive-satisfaction-b-list ] of alter
+    motive-similarities-a
+    motive-similarities-b
+    relative-aspiration
+  )
+  
+  ; update the satisfaction items in the list
+  let LIST-START-ITEM 0
+  set new-representation 
+    sentence
+      ; start of list
+      (sublist new-representation LIST-START-ITEM MOTIVE-SATISFACTION-A-LIST-ITEM) 
+      ; satisfaction items (new)
+      (sentence new-satisfaction-items
+        ; rest of list
+        (sublist new-representation 
+          (RELATIVE-ASPIRATION-INQUIRING-ITEM + 1) (length new-representation)))
+
+  ; calculate the persuasiveness
+  ; update persuasion lists
+  ; a-list persuasion
+  set new-representation 
+    replace-item INQUIRING-PERSUASION-A-LIST-ITEM
+      new-representation
+      map 
+        [similarity -> similarity * relative-aspiration]
+        (motive-similarities-a)
+  ; b-list persuasion
+  set new-representation
+    replace-item INQUIRING-PERSUASION-B-LIST-ITEM
+      new-representation
+      map 
+        [similarity -> similarity * relative-aspiration]
+        (motive-similarities-b)
+  
+  ; sum up the persuasions, this may be used now by the HUMAT to select the
+  ; neighbor they inquire with
+  set new-representation 
+    replace-item INQUIRING-PERSUASION-ITEM
+      new-representation
+    (
+      reduce + (item INQUIRING-PERSUASION-A-LIST-ITEM new-representation)
+      +
+      reduce + (item INQUIRING-PERSUASION-B-LIST-ITEM new-representation)
+    )
+
+  report new-representation
+end
+
+; Finds the representation of the given alter in the representation list
+to-report Find-Alter-Representation [ alter local-representation-list ]
+  foreach local-representation-list [
+    representation -> 
+    if first representation = [ who ] of alter [
+      report representation
+    ]
+  ]
+  error (sentence "Could not find alter representation for: " alter)
+end
+
+; Searches the list for a representation of the same alter and replaces its value
+; with the given representation. Reports the modified list
+to-report Find-And-Replace-Alter-Representation [ local-representation-list representation ]
+  foreach local-representation-list [
+    current-item ->
+    ; the first item in the list is the 'who'
+    if first current-item = first representation [
+      ; report the list with the updated representation
+      report replace-item (position current-item local-representation-list)
+          local-representation-list 
+          representation
+    ]
+  ]
+  ; we could not find the alter in the list, so instead we report the list with
+  ; the alter appended to it
+  report lput representation local-representation-list
+end
+
+; HUMAT procedure that initialized and adds an alter representation for the given
+; critical node
+to Add-Alter-Representation-For-Critical-Node [ current-critical-node ]
+  ; initialize the list
+  let working-list 
+    Initialize-Alter-Representation-Of-Critical-Node current-critical-node
+  ; add the item
+  set alter-representation-list lput working-list alter-representation-list
+end
+
+to-report Initialize-Alter-Representation-Of-Critical-Node [ current-critical-node ]
+  let alter current-critical-node
+  
+  ; create the representation including the accurate alternative
+  report Initialize-Alter-Representation
+     ([ who ] of alter) ([ current-alternative ] of alter)
+end
+
+; takes the two variables required for the initial list and generates the rest
+; of the alter representation structure
+to-report Initialize-Alter-Representation [ who-number guessed-alternative ]
+  ; NOTE: the default value of a boolean in the representation is set to 0
+  ; rather than false. This is because NetLogo does not allow comparison of
+  ; boolean values and we want that functionality
+  
+  let UNINITIALIZED-NUMBER 0
+  let BOOLEAN-DEFAULT GLOBAL-BOOLEAN-FALSE
+  report ( list
+    ; item 0 who
+    who-number
+    ; item 1 inquired? 0 for not inquired with, 1 for inquired with already
+    BOOLEAN-DEFAULT
+    ; item 2 signaled? 0 for not signaled to, 1 for signaled to already
+    BOOLEAN-DEFAULT
+    ; item 3 behaviour ; this is a guessed behaviour with 20% error rate
+    guessed-alternative
+    ; item 4 1 for same guessed behaviour; 0 for different guessed behaviour
+    ; used for inquiring
+    Same-Alternatives? guessed-alternative current-alternative
+    ; item 5 [motive-importances-list] of alter-link
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 6 [motive-satisfaction-a-list] of alter-link
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 7 [motive-satisfaction-b-list] of alter-link
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 8 [motive-similarity-a-list] of alter-link
+    ; similarity between the importance of needs
+    ; only > 0 if the given BA satisfies that group of needs in a similar
+    ; direction for the alter and for the ego
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 9 [motive-similarity-b-list] of alter-link
+    ; similarity between the importance of needs
+    ; only > 0 if the given BA satisfies that group of needs in a similar
+    ; direction for the alter and for the ego
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 10 relative-aspiration-influenced-ego
+    ; relative social appeal/status (aspiration characteristic) in case of inquiring
+    UNINITIALIZED-NUMBER
+    ; item 11 relative-aspiration-influenced-alter
+    ; relative social appeal/status (aspiration characteristic) in case of signaling
+    UNINITIALIZED-NUMBER
+    ; item 12 [ inquiring-persuasion-A-motive ]
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 13 [ inquiring-persuasion-B-motive ]
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 14 [ signaling-persuasion-A-motive ]
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 15 [ signaling-persuasion-B-motive ]
+    n-values motive-count [ UNINITIALIZED-NUMBER ]
+    ; item 16 [ inquiring-persuasion ]
+    UNINITIALIZED-NUMBER
+    ; item 17 [ signaling-persuasion ]
+    UNINITIALIZED-NUMBER
+  )
+end
+
+to Output-Alter-Representation [ representation ]
+  OPV (word "Representation of HUMAT " first representation)
+  OPV (word "Inquired: " item INQUIRED?-ITEM representation)
+  OPV (word "Signaled: " item SIGNALED?-ITEM representation)
+  OPV (word "Presumed alternative: " item ALTERNATIVE-ITEM representation)
+  OPV (word "Same-as-me: " item SAME?-ITEM representation)
+  OPV (word "Importances: " item MOTIVE-IMPORTANCES-ITEM representation)
+  OPV (word "A-Sats: " item MOTIVE-SATISFACTION-A-LIST-ITEM representation)
+  OPV (word "B-Sats: " item MOTIVE-SATISFACTION-B-LIST-ITEM representation)
+  OPV (word "A-Sims: " item MOTIVE-SIMILARITY-A-LIST-ITEM representation)
+  OPV (word "B-Sims: " item MOTIVE-SIMILARITY-B-LIST-ITEM representation)
+  OPV (word "Asp-When-Ego-Inquires-Alter: " item RELATIVE-ASPIRATION-INQUIRING-ITEM representation)
+  OPV (word "Asp-When-Ego-Signals-Alter: " item RELATIVE-ASPIRATION-SIGNAL-ITEM representation)
+  OPV (word "Inq-A-Pers: " item INQUIRING-PERSUASION-A-LIST-ITEM representation)
+  OPV (word "Inq-B-Pers: " item INQUIRING-PERSUASION-B-LIST-ITEM representation)
+  OPV (word "Sig-A-Pers: " item SIGNAL-PERSUASION-A-ITEM representation)
+  OPV (word "Sig-B-Pers: " item SIGNAL-PERSUASION-B-ITEM representation)
+  OPV (word "Summed-Persuasion-(INQ): " item INQUIRING-PERSUASION-ITEM representation)
+  OPV (word "Summed-Persuasion-(SIG): " item SIGNALING-PERSUASION-ITEM representation)
+end
+
+to OPAR [ representation ]
+  Output-Alter-Representation representation
+end
+
+to Output-All-Alters-Humat
+  OPV (word "alters of humat " who)
+  foreach alter-representation-list [ x -> OPAR x ]
+end

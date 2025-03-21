@@ -1,0 +1,125 @@
+globals [
+  simulation-ready?
+  global-convergence-metric-list
+  converged
+  GLOBAL-NUMBER-OF-STATES-FOR-CONVERGENCE
+  GLOBAL-CONVERGENCE-EPSILON
+  GLOBAL-ALTERNATIVES
+  GLOBAL-NUMBER-OF-AGENTS
+  GLOBAL-NO-DILEMMA
+  GLOBAL-OPT-OUT-ALTERNATIVE
+  GLOBAL-OPT-IN-ALTERNATIVE
+  ; we use these in the representation because NetLogo does not order booleans
+  GLOBAL-BOOLEAN-TRUE
+  GLOBAL-BOOLEAN-FALSE
+  MOTIVE-PRECISION
+  ; globals to ease the use of the alter representation (provide item nrs.)
+  WHO-ITEM
+  INQUIRED?-ITEM
+  SIGNALED?-ITEM
+  ALTERNATIVE-ITEM
+  SAME?-ITEM
+  MOTIVE-IMPORTANCES-ITEM
+  MOTIVE-SATISFACTION-A-LIST-ITEM
+  MOTIVE-SATISFACTION-B-LIST-ITEM
+  MOTIVE-SIMILARITY-A-LIST-ITEM
+  MOTIVE-SIMILARITY-B-LIST-ITEM
+  RELATIVE-ASPIRATION-INQUIRING-ITEM
+  RELATIVE-ASPIRATION-SIGNAL-ITEM
+  INQUIRING-PERSUASION-A-LIST-ITEM
+  INQUIRING-PERSUASION-B-LIST-ITEM
+  SIGNAL-PERSUASION-A-ITEM
+  SIGNAL-PERSUASION-B-ITEM
+  INQUIRING-PERSUASION-ITEM
+  SIGNALING-PERSUASION-ITEM
+  ; motive item numbers
+  SOCIAL-MOTIVE-ITEM
+  FINANCIAL-MOTIVE-ITEM
+  COMFORT-MOTIVE-ITEM
+  CLIMATE-MOTIVE-ITEM
+  ; model metaparameters
+  NUMBER-OF-MOTIVES-PARAMETER
+  ; file i/o globals
+  agent-file-path
+  ; cached globals for visualization
+  vis-maximum-signal-communications
+  vis-maximum-inquire-communications
+  ; campaign variables
+  campaign-file-enabled?
+  campaign-file-path
+  ; event spec
+  EVENT-NAME-ITEM
+  TICK-ITEM
+  REACH-ITEM
+  STRENGTH-ITEM
+  ; quietmode for experiments
+  shush
+  ; Experiment related variables (TO BE USED ONLY IN EXPERIMENTS)
+  output-folder
+  ; NOTE: this global needs to be set explicitly as the random seed, e.g. 
+  ; through using the Set-And-Report-Seed reporter
+  global-random-seed
+  ; probability an agent will actually communicate on a given tick when it is
+  ; in a dissonant state
+  global-communication-p
+]
+
+; Model hardcoded method to set the global constants.
+; Use SCREAMING-KEBAB case to match the general style of NetLogo but clearly
+; distinguish the intended constant usecase
+to Set-Hardcoded-Global-Constants
+  set GLOBAL-ALTERNATIVES ["A" "B"]
+  set GLOBAL-NUMBER-OF-AGENTS 10
+  set GLOBAL-NO-DILEMMA "none"
+  set GLOBAL-BOOLEAN-TRUE 1
+  set GLOBAL-BOOLEAN-FALSE 0
+  set global-convergence-metric-list []
+  set converged false
+  set MOTIVE-PRECISION 3
+  set-Alter-Index-Global-Constants
+  set GLOBAL-OPT-OUT-ALTERNATIVE "B"
+  set GLOBAL-OPT-IN-ALTERNATIVE "A"
+  set NUMBER-OF-MOTIVES-PARAMETER 4
+  set SOCIAL-MOTIVE-ITEM 0
+  set FINANCIAL-MOTIVE-ITEM 1
+  set COMFORT-MOTIVE-ITEM 2
+  set CLIMATE-MOTIVE-ITEM 3
+  set simulation-ready? false
+  set vis-maximum-inquire-communications 1
+  set vis-maximum-signal-communications 1
+  ; set the initial value of the campaign globals if they are unset
+  if campaign-file-enabled? = 0 [ 
+    set campaign-file-enabled? false 
+    set campaign-file-path false
+  ]
+  ; Event specification constants
+  set EVENT-NAME-ITEM 0
+  set TICK-ITEM 1
+  set REACH-ITEM 2
+  set STRENGTH-ITEM 3
+  ; use a 100% communication chance by default
+  if global-communication-p = 0 [
+    set global-communication-p 1.0
+  ]
+end
+
+to Set-Alter-Index-Global-Constants
+  set WHO-ITEM 0
+  set INQUIRED?-ITEM 1
+  set SIGNALED?-ITEM 2
+  set ALTERNATIVE-ITEM 3
+  set SAME?-ITEM 4
+  set MOTIVE-IMPORTANCES-ITEM 5
+  set MOTIVE-SATISFACTION-A-LIST-ITEM 6
+  set MOTIVE-SATISFACTION-B-LIST-ITEM 7
+  set MOTIVE-SIMILARITY-A-LIST-ITEM 8
+  set MOTIVE-SIMILARITY-B-LIST-ITEM 9
+  set RELATIVE-ASPIRATION-INQUIRING-ITEM 10
+  set RELATIVE-ASPIRATION-SIGNAL-ITEM 11
+  set INQUIRING-PERSUASION-A-LIST-ITEM 12
+  set INQUIRING-PERSUASION-B-LIST-ITEM 13
+  set SIGNAL-PERSUASION-A-ITEM 14
+  set SIGNAL-PERSUASION-B-ITEM 15
+  set INQUIRING-PERSUASION-ITEM 16
+  set SIGNALING-PERSUASION-ITEM 17
+end

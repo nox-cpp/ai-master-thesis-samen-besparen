@@ -1,0 +1,226 @@
+; Calculates and returns the general satisfaction of the agent
+to-report Calculate-Evaluation [ alternative ]
+  ; calculate the motive-satisfactions and sum up
+  let sum-evaluation (reduce + Calculate-Evaluation-List alternative)
+  
+  ; normalize by motive-count
+  report sum-evaluation / motive-count
+end
+
+; Calculates and returns the evaluation of all needs given an alternative
+to-report Calculate-Evaluation-List [ alternative ]
+  report (map
+    [index -> Calculate-Evaluation-X index alternative]
+    range motive-count
+  )
+end
+
+; Calculates and returns the satisfaction of the x'th motive
+to-report Calculate-Evaluation-X [ index alternative ]
+  ; select the correct list given the alternative
+  let satisfaction-list (
+    ifelse-value (alternative = "A") 
+      [motive-satisfaction-a-list]
+      [motive-satisfaction-b-list])
+  
+  ; calculate the evaluation
+  report (item index satisfaction-list) * (item index importance-list)
+end
+
+; calculates the cognitive dissonance of a given agent
+to-report Calculate-Dissonance [ alternative ]
+  ; the sum of all satisfying evaluations
+  let sum-of-satisfaction 0.0
+  ; the sum of all dissatisfying evaluations
+  let sum-of-dissatisfaction 0.0
+
+  ; loop over all the evaluations and add them to their bin
+  foreach range motive-count [
+    ; index in the motive list
+    index ->
+    let evaluation (Calculate-Evaluation-X index alternative)
+    let current-label (Determine-Satisfaction-Label evaluation)
+    
+    ; switch-case-esque
+    (ifelse
+      current-label = "satisfied" [
+      set sum-of-satisfaction (sum-of-satisfaction + evaluation)]
+      current-label = "dissatisfied" [
+      set sum-of-dissatisfaction (sum-of-dissatisfaction + abs(evaluation))]
+    )
+  ]
+
+  ; calculate the overall dissonant/consonant cognitions
+  let dissonant-cognitions 
+    (min (list sum-of-satisfaction sum-of-dissatisfaction))
+  let consonant-cognitions 
+    (max (list sum-of-satisfaction sum-of-dissatisfaction))
+
+  ; this case is highly unlikely, but we check it just in case
+  if dissonant-cognitions = consonant-cognitions and dissonant-cognitions = 0.0
+  [
+    Output-Print-Verbose (word "agent " who " is ambivalent (D = C = 0.0)")
+    ; in case both terms are 0, avoid division by 0 and report 0 dissonance
+    report 0.0
+  ]
+
+  report max (list
+      0.0
+      ((2 * dissonant-cognitions) / (dissonant-cognitions + consonant-cognitions)))
+end
+
+; classifies an evaluation value
+; Can be one of {"dissatisfied", "satisfied", "neutral"}
+to-report Determine-Satisfaction-Label [ evaluation ]
+  report ifelse-value evaluation < 0.0 
+    ["dissatisfied"]
+    [ifelse-value evaluation > 0.0 
+      [ "satisfied" ]
+      [ "neutral" ]
+    ]
+end
+
+; reports the satisfaction label of motive at index for the given alternative
+; Can be one of {"dissatisfied", "satisfied", "neutral"}
+to-report Determine-Satisfaction-Label-X [ index alternative ]
+    let evaluation (Calculate-Evaluation-X index alternative)
+    report Determine-Satisfaction-Label evaluation
+end
+
+; Returns one of three values {"none", "social", "non-social"}, which 
+; correspond to the kind of dilemma that is faced by the humat (if any)
+to-report Determine-Dilemma-Status
+  let dissonance Current-Dissonance
+
+  ; basic outcome, no dilemma
+  if dissonance = 0.0 [ report "none"]
+
+  ; check the social evaluation
+  let current-social-evaluation (Social-Evaluation current-alternative)
+  let current-social-satisfaction-label 
+    (Determine-Satisfaction-Label current-social-evaluation)
+  
+  ; if the social need is not dissatisfied, the dilemma is always non-social
+  if current-social-satisfaction-label = "dissatisfied" [
+    ; it's possible for an agent to be both in a social and non-social dilemma
+    if One-Non-Social-Need-Satisfied? [
+      if One-Non-Social-Need-Dissatisfied? [ report "both" ]
+      report "social"]
+  ]
+
+  ; in all other cases it might be a social dilemma
+  report (ifelse-value All-Non-Social-Needs-Satisfied?  [ "none" ] [ "non-social" ])
+end
+
+; Reports true if the agent has any non-social needs that are satisfied
+to-report One-Non-Social-Need-Satisfied?
+  ; if at least one non-social need is satisfied this reports true
+  report reduce or 
+    map 
+      [index -> 
+        (Determine-Satisfaction-Label-X index current-alternative) = "satisfied"
+      ] 
+      (range 1 motive-count)
+end
+
+; Reports true if the agent has any non-social needs that are satisfied
+to-report One-Non-Social-Need-Dissatisfied?
+  ; if at least one non-social need is satisfied this reports true
+  report reduce or 
+    map 
+      [index -> 
+        (Determine-Satisfaction-Label-X index current-alternative) = "dissatisfied"
+      ] 
+      (range 1 motive-count)
+end
+
+to-report All-Non-Social-Needs-Satisfied?
+  report reduce and
+    map 
+      [index ->
+        (Determine-Satisfaction-Label-X index current-alternative) = "satisfied"]
+      (range 1 motive-count)
+end
+
+to-report Motive-Similarity-List [ ego alter alternative ]
+  report (Need-Similarity-List 
+      ([Calculate-Evaluation-List alternative] of ego)
+      ([Calculate-Evaluation-List alternative] of alter)
+      [importance-list] of ego
+      [importance-list] of alter)
+end
+
+; Reports the social satisfaction of an agent for the given alternative
+; Social satisfaction is calculated based on presumed alternative, not actual
+; alternative of the alter
+to-report Calculate-Social-Satisfaction [ alternative ]
+  ; we count the number of humat-neighbors here, as the number of alter 
+  ; representations is affected by the number of critical nodes, which are not 
+  ; themselves humats
+  let number-of-alters count my-humat-neighbors
+  
+  ; we count the linked alters that have the same current-alternative
+  let number-of-similars (
+    sum map 
+      [
+        ; sum the same-item field for all neighbors (but not critical nodes)
+        alter -> 
+          ifelse-value is-humat? turtle item WHO-ITEM alter 
+          [ item SAME?-ITEM alter ]
+          [ 0 ]]
+      alter-representation-list)
+  
+  ; relative number of alters with a similar opinion
+  ; consider a lonesome humat socially satisfied
+  let fraction-of-similars (
+    ifelse-value number-of-alters > 0 [ number-of-similars / number-of-alters ] [ 1 ])
+
+  ; calculate the satisfaction for the given alternative 
+  ; (normalize to the satisfaction range)
+  let my-alternative current-alternative ; just to avoid (my) confusion
+  ifelse my-alternative = alternative 
+  [report Normalized-Min-Max fraction-of-similars 0 1 -1 1]
+  [report Normalized-Min-Max (1.0 - fraction-of-similars) 0 1 -1 1]
+end
+
+; Computes and reports the relative aspiration level of two agents
+to-report Calculate-Relative-Aspiration [aspiration-influencing aspiration-influenced] 
+  let ASPIRATION-FACTOR 0.4
+  let rel-aspiration ASPIRATION-FACTOR * (aspiration-influencing - aspiration-influenced)
+  ; return a value in the range of [0, 1]. Negative values may be obtained if
+  ; aspiration of influenced exceeds that of influencer which must be avoided
+  report (max (list 0.0 rel-aspiration))
+end
+
+to-report Updated-Satisfaction [ ego-satisfaction alter-satisfaction persuasion ]
+  report (1.0 - persuasion) * ego-satisfaction + (alter-satisfaction * persuasion)
+end
+
+; Computes an updated satisfaction list given the ego satisfaction, alter
+; satisfaction and their persuasiveness.
+; NOTE: The social satisfaction is not affected by persuasion so is kept the same
+to-report Updated-Satisfaction-List [
+   motive-satisfaction-me motive-satisfaction-them motive-persuasion-them ]
+  ; updated motives are experiential and value motives
+  let updated-motives map [
+      index -> 
+            (Updated-Satisfaction 
+              item index motive-satisfaction-me
+              item index motive-satisfaction-them
+              item index motive-persuasion-them)
+    ] 
+    ; note the [1] here, in order to skip the social satisfaction
+    (range 1 motive-count)
+  
+  ; report the updated motives with the (unchanged) social motive at the front
+  report fput (first motive-satisfaction-me) updated-motives
+end
+
+; reports a list of the deltas in satisfactions of an agent
+to-report Satisfaction-Deltas [ prior-satisfactions current-satisfactions ]
+  report map 
+    [ motive-index -> 
+      (item motive-index current-satisfactions)
+      - (item motive-index prior-satisfactions)]
+    range motive-count 
+end

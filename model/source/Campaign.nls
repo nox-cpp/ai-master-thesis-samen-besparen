@@ -1,0 +1,232 @@
+; This file contains the necessary procedures to enable the campaign submodel
+to Campaign [ nr-of-agents signal-strength ]
+  Output-Print-Regular (
+    word id-in-dataset " (" who ") executing campaign event; reach = " nr-of-agents " strength =" signal-strength)
+  
+  ; Select event targets
+  let target-set Randomly-Select-Targets nr-of-agents
+  
+  ; used as a maximum nr of items to report on
+  let MAX-NR-TO-STORE 10
+
+  Output-Print-Verbose "(part of) agentset selected for campaign: "
+  ask up-to-n-of MAX-NR-TO-STORE target-set [
+     Output-Print-Verbose (sentence "name: " id-in-dataset " (" who ")") ]
+
+  ; store their current satisfactions
+  let nr-to-store (min (list count target-set MAX-NR-TO-STORE))
+  
+  ; create a sorted list for the purpose of reporting
+  let agent-list up-to-n-of nr-to-store (sort target-set)
+  
+  ; collect some of the satisfactions prior to signaling
+  let a-sats (map [ agent -> [ motive-satisfaction-a-list ] of agent ] agent-list)
+  let b-sats (map [ agent -> [ motive-satisfaction-b-list ] of agent ] agent-list)
+
+  ; set the relative aspiration for this campaign to the signal strength
+  set aspiration-level signal-strength
+
+  ; do the signaling
+  ask target-set [ Signaled-Alter-Update-Representation ]
+  
+  ; print some diagnostic information
+  Output-Campaign-Deltas a-sats b-sats agent-list
+end
+
+; Campaign description is a list of four items:
+; 1. the name of the agent executing the event
+; 2. the tick at which the event is to be executed
+; 3. the number of agents affected by the event
+; 4. the strength of the campaign event signal
+to Schedule-Campaign-Event [ campaign-description ]
+  ; get the correct agent for the event
+  let executor critical-nodes with [
+     id-in-dataset = item EVENT-NAME-ITEM campaign-description ]
+  
+  ; add the event to the schedule
+  time:schedule-event executor [ [] ->
+     Campaign 
+      (item REACH-ITEM campaign-description)
+      (item STRENGTH-ITEM campaign-description) ]
+    item TICK-ITEM campaign-description
+end
+
+; Reports a randomly selected agentset of a size going up to either nr-of-targets
+; or, if nr-of-targets is in [0,1], a fraction of the total population
+; nr-of-targets can
+to-report Randomly-Select-Targets [ nr-of-targets ]
+  let number (ifelse-value nr-of-targets < 1.0 [ nr-of-targets * count humats ] [ nr-of-targets ])
+  report up-to-n-of number humats
+end
+
+; Writes output to the log indicating the difference in satisfaction of the
+; given agents before and after an event (e.g. a campaign)
+; <x>-sats-before are the satisfactions of the agents before the event and the
+; agent-list is used to get the satisfactions after (i.e. now)
+; Assumes that the list of satisfactions and agents map onto eachother in order
+; and that the satisfaction lists have at least as many entries as the agent-list
+to Output-Campaign-Deltas [ a-sats-before b-sats-before agent-list ]
+  ; get the satisfaction delta's after updating and print some to the log
+  Output-Print-Verbose 
+    "Showing satisfaction delta's for a (sub)set of the influenced agents (omitting the social satisfactions)"
+  let a-deltas
+    ; for each agent and each motive, calculate the difference and return the
+    ; result as a list of lists (one list for each agent, containing the deltas
+    ; for each motive except the first (the social motive))
+    map 
+      [ index -> 
+        Satisfaction-Deltas 
+          (item index a-sats-before) 
+          ([ motive-satisfaction-a-list ] of item index agent-list)]
+      range length agent-list
+  
+  ; for each agent, print a summary of it's deltas (A)
+  foreach map 
+    [ index ->
+     Summarize-Humat-Satisfaction-Deltas (item index agent-list) (item index a-deltas) ] 
+    range length agent-list [
+      result ->
+      Output-Print-Verbose result
+    ]
+  
+  Output-Print-Verbose "B deltas"
+  let b-deltas 
+    ; for each agent and each motive, calculate the difference and return the
+    ; result as a list of lists (one list for each agent, containing the deltas
+    ; for each motive except the first (the social motive))
+    map 
+      [ index -> 
+        Satisfaction-Deltas 
+          (item index b-sats-before) 
+          ([ motive-satisfaction-b-list ] of item index agent-list)]
+      range length agent-list
+  
+  ; for each agent, print a summary of it's deltas (B)
+  foreach map 
+    [ index ->
+     Summarize-Humat-Satisfaction-Deltas (item index agent-list) (item index b-deltas) ] 
+    range length agent-list [
+    result ->
+    Output-Print-Verbose result
+  ]
+end
+
+to-report Summarize-Humat-Satisfaction-Deltas [ agent deltas ]
+  report (
+    sentence "agent ( "([ who ] of agent ) ") " 
+      (map [ number -> precision number 4 ] but-first deltas))
+end
+
+; Prepares a procedural campaign, to be used at setup
+to Procedural-Campaign
+  ; create and add the campaigner node
+  let default-executor-name "grunneger-power"
+  let executor (Create-Default-Critical-Node-Description default-executor-name)
+  Add-Critical-Node executor
+  Output-Print-Regular (word "Added default campaigner: " first executor)
+
+  ; create and schedule all events
+  let default-campaign-list (list
+    (list default-executor-name 2 10 1.0)
+    (list default-executor-name 5 100 0.5)
+    (list default-executor-name 10 0.1 0.3)
+  )
+  foreach default-campaign-list [ event -> Schedule-Campaign-Event event ]
+  
+  Output-Print-Regular (
+    word "Registered " (length default-campaign-list) " events")
+end
+
+to Campaign-From-File [ file-path ]
+  file-open file-path
+  
+  ; skip the first line, it may be used as a comment (optionally output it)
+  OPV "Reserved line of critical node spec:"
+  OPV file-read-line
+
+  ; the first line of the file gives the specs of the node
+  let node-specs Critical-Node-Specs-From-File file-path
+  
+  ; check if the specs are valid
+  ifelse not Valid-Agent-Description? node-specs [
+    ; warn the user, and skip the campaign setup
+    Output-Warnings-Invalid-Spec node-specs file-path
+  ]
+  [
+    ; read the campaign events (skips the first TWO lines)
+    let event-specs but-first but-first csv:from-file file-path
+
+    ; augment the event specs with the humat name
+    set event-specs map [ specs -> (sentence first node-specs specs) ] event-specs
+    
+    ; check if all events are valid, only add the campaign if so
+    let validity-events map [ spec -> Valid-Event-Spec? spec ] event-specs
+    ifelse not (reduce and validity-events)
+    [
+      ; warn the user and skip the campaign
+      Output-Warnings-Invalid-Events event-specs validity-events file-path
+    ]
+    [
+      ; add the critical node
+      Add-Critical-Node node-specs
+      Output-Print-Regular (word "Added a campaigner with name: " first node-specs)
+      
+      ; register the events
+      foreach event-specs [ specs -> Schedule-Campaign-Event specs ]
+      
+      Output-Print-Regular (word "Registered " ((length event-specs) - 1) " events")
+    ]
+  ]
+
+  ; clean up
+  file-close-all
+end
+
+; Creates and reports the description of the default critical node agent
+to-report Create-Default-Critical-Node-Description [ input-name ]
+  let DEFAULT-UNUSED-VALUE 0.0
+  report (list
+    input-name            ; name
+    DEFAULT-UNUSED-VALUE  ; tolerance (unused)
+    DEFAULT-UNUSED-VALUE  ; base aspiration (not used currently)
+    "A"                   ; alternative
+    4                     ; motive-count
+    0.5 0.5 0.5 0.5       ; importances
+    1 -1 1 -1 1 -1 1 -1 1 ; a/b motive satisfactions (interleaved)
+  )
+end
+
+to Add-Critical-Node [ critical-node-spec ]
+  create-critical-nodes 1 [
+    Initialize-Critical-Node-From-Description critical-node-spec
+  ]
+end
+
+; Gives warnings about the invalid spec with relevant context
+to Output-Warnings-Invalid-Spec [ invalid-node-spec file-path ]
+  Output-Print-Regular 
+    "Critical node description invalid, please check input file"
+  Output-Print-Quote-Strings-Regular "Description: " invalid-node-spec
+  Output-Print-Regular (word "Source file: " file-path)
+  Output-Print-Regular 
+    "NOTE: Trailing/leading whitespace in .csv's is not allowed"
+end
+
+to Output-Warnings-Invalid-Events [ event-specs validity-events file-path ]
+  Output-Print-Regular 
+    "Not all campaign events had a valid spec, skipping campaign"
+
+  ; report the invalid specs to the user
+  foreach range length event-specs [
+    index ->
+    if not (item index validity-events) [
+      Output-Print-Quote-Strings-Regular
+       "Invalid spec: " (item index event-specs)
+      ]
+  ]
+
+  ; give some pointers
+  Output-Print-Regular (word "Please check input file: " file-path)
+  Output-Print-Regular 
+    "NOTE: Trailing/leading whitespace in .csv's is not allowed"
+end

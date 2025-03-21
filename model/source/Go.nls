@@ -1,0 +1,120 @@
+; The main simulation procedure. Executes each submodel in a given order and
+; increments the clock
+to go
+  if not simulation-ready? [
+    Output-Print-Regular "Please initialize the model, go aborted"
+    stop
+  ]
+  
+  ; Handle the signaling
+  Output-Print-Verbose "Running signaling model"
+  Submodel-Signal
+  
+  ; Handle the inquiring
+  Output-Print-Verbose "Running inquiring model"
+  Submodel-Inquire
+
+  ; Run any scheduled campaign events
+  Output-Print-Verbose "Running campaign model"
+  Submodel-Campaign
+  
+  ; Have humats update their state and visualization
+  Output-Print-Verbose "Update HUMATs"
+  Submodel-Update
+
+  ; check for convergence
+  if Detect-Convergence?  [
+    Output-Print-Regular 
+      (word "Model has converged at step " ticks)
+    set converged true
+    
+    ; do not stop if there are still scheduled events
+    if Empty-Schedule? [
+      ; model has converged and no more events, we end
+      stop
+    ]
+  ]
+
+  ; Increment clock
+  Output-Print-Verbose word "Increment clock to " ticks
+  tick
+end
+
+; Performs update step for all agents
+to Submodel-Update
+ Update-Humats
+end
+
+; Performs signaling step for all agents
+to Submodel-Signal
+  Signal
+end
+
+; Performs inquiring step for all agents
+to Submodel-Inquire
+  Inquire
+end
+
+; Performs the campaign step of the model
+to Submodel-Campaign
+  ; execute all scheduled events for the current time-step
+  time:go-until ticks
+end
+
+; Updates humat state and visualization
+to Update-Humats
+    ask humats [
+      ; update state
+    Update-Humat ]
+  Update-Globals
+  ask humats [
+      ; update view
+      Update-Humat-Visualization
+    ]
+end
+
+; Reports true if the model has (seemingly) reached a state of convergence
+; This may occur as long as the model does not contain to much stochasticity
+to-report Detect-Convergence?
+  let number-of-states-for-convergence GLOBAL-NUMBER-OF-STATES-FOR-CONVERGENCE
+  ; compute the metrics for the current state
+  let latest-metric Compute-Convergence-Metric
+
+  ; basic detection, if the state has not changed significantly for some ticks
+  ; then we assume convergence
+  if length global-convergence-metric-list < number-of-states-for-convergence [
+    set global-convergence-metric-list
+      lput latest-metric global-convergence-metric-list
+    report false
+  ]
+
+  ; check if the metrics have been the same
+  if reduce and 
+    map 
+      ; compares each metric list stored to the latest
+      [ metric -> Equal-Convergence-Metrics? latest-metric metric ]
+      global-convergence-metric-list
+  [
+    ; the metrics haven't changed
+    report true
+  ]
+
+  ; the metrics are not yet stable, update the list
+  set global-convergence-metric-list
+     lput latest-metric but-first global-convergence-metric-list
+  report false  
+end
+
+; Updates global variables required for agent visualization
+to Update-Globals
+  ask max-one-of humats 
+    [ #signaling + #signaled ]
+    [ set vis-maximum-signal-communications (#signaling + #signaled)]
+  ask max-one-of humats 
+    [ #inquiring + #inquired]
+    [ set vis-maximum-inquire-communications (#inquiring + #inquired)]
+end
+
+to-report Empty-Schedule?
+  report time:size-of-schedule = 0
+end

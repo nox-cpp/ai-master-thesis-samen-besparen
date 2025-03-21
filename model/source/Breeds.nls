@@ -1,0 +1,108 @@
+breed [humats humat]
+breed [critical-nodes critical-node]
+
+; Household agent attributes
+humats-own [
+  ;; Static humat attributes ;;;
+  ; list where each item is the importance of one motive
+  ; NOTE: the first item (i.e. item 0) is the social importance
+  importance-list
+  ; extent to which an agent will ignore built-up dissonance
+  dissonance-tolerance
+  ; aspiration level, impacts agents ability to influence and be influenced
+  aspiration-level
+  ; convenience variable to avoid procedure calls
+  motive-count
+  ; sum of importance (used a lot in computation so computed at setup)
+  importance-sum
+  ;; Static humat attributes ;;;
+
+  ;;; Dynamic humat attributes ;;;;
+  ;;; (attributes that change throughout the simulation) ;;;;
+  ; currently selected alternative
+  ; a == opt-in; b == opt-out
+  current-alternative
+  ; current satisfactions of the motives/needs (for either alternative)
+  ; NOTE: social satisfactions are stored as motive-0
+  motive-satisfaction-a-list
+  motive-satisfaction-b-list
+  ; the degree of cognitive dissonance experienced by the agent for each
+  ; alternative
+  dissonance-value-a
+  dissonance-value-b
+  ; NOTE: evaluations are not stored but computed on demand
+  ;
+  ; Whether or not the agent is currently experiencing a social dilemma and
+  ; if so, which type of dilemma {"none", "social", "non-social", "both"}
+  dilemma-status
+  ; overall evaluation is a product of all evaluations for the currently
+  ; selected alternative. we store it for ease of reporting
+  overall-evaluation
+  ;;; end of process attributes ;;;;
+
+  ;;; Signaling attributes ;;;;
+  ; representations of linked humat alters
+  alter-representation-list
+  ; NOTE: the boolean signaling?/inquiring? attributes are mutually exclusive
+  ; boolean: positive [1] if the ego is inquiring at a given tick
+  inquiring? 
+  ; boolean: positive [1] if the ego is signaling at a given tick
+  signaling? 
+  ;;; end of signaling attributes ;;;;
+
+  ;;; reporter attributes ;;;;
+  ; these attributes serve as main purpose to allow for reporting of the
+  ; model's state and history and are not used in the agent rules
+  ; the number of times humat signaled to alters
+  #signaling
+  ; the number of times humat was signaled to
+  #signaled
+  ;the number of times humat inquired with alters
+  #inquiring
+  ; the number of times humat was inquired with by egos
+  #inquired
+  ; (normalized) expected satisfactions for both alternatives
+  expected-satisfaction-a
+  expected-satisfaction-b
+  ;;; end of reporter attributes ;;;;
+  ;; id, can be used to relate agents to their source data
+  id-in-dataset
+]
+
+; Critical nodes contain a modified list of regular humat attributes
+critical-nodes-own [
+  ;; Static humat attributes ;;;
+  ; NOTE: All attributes are static for critical nodes
+  id-in-dataset
+  ; list where each item is the importance of one motive
+  ; NOTE: the first item (i.e. item 0) is the social importance
+  importance-list
+  ; aspiration level, impacts agents ability to influence and be influenced
+  aspiration-level
+  ; convenience variable to avoid procedure calls
+  motive-count
+  ; sum of importance (used a lot in computation so computed at setup)
+  importance-sum
+  ; currently selected alternative
+  ; a == opt-in; b == opt-out
+  current-alternative
+  ; current satisfactions of the motives/needs (for either alternative)
+  ; NOTE: social satisfactions are stored as motive-0
+  motive-satisfaction-a-list
+  motive-satisfaction-b-list
+  ;; Static humat attributes ;;;
+
+  ;;; Dynamic humat attributes ;;;;
+  ;;; (attributes that change throughout the simulation) ;;;;
+  ;;; Signaling attributes ;;;;
+  ; boolean: positive [1] if the ego is signaling at a given tick
+  signaling? 
+  ;;; end of signaling attributes ;;;;
+
+  ;;; reporter attributes ;;;;
+  ; these attributes serve as main purpose to allow for reporting of the
+  ; model's state and history and are not used in the agent rules
+  ; the number of times humat signaled to alters
+  #signaling
+  ;;; end of reporter attributes ;;;;
+]

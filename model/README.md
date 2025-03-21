@@ -1,0 +1,2 @@
+# Model code
+This folder contains the netlogo implementation of the model used in the research project. It is based on the implementation created for the Groningen Holistic Mobility model from the SMARTEES research project. See the following links for more information [SMARTEES](https://local-social-innovation.eu/), [GitHub](https://github.com/garypolhill/SMARTEES-models).

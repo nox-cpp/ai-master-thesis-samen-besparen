@@ -1,0 +1,147 @@
+to Signal
+  ; SIGNALING
+  ; signaling strategy - spread information in social network to reduce cognitive dissonance via altering ALTERs' knowledge structures
+  ; during signaling information flows uni-directionally from the ego, who was giving advice to the alter, who was made to listed
+  ; subset the agents that are facing a social dilemma
+  
+  ; for all humats that are not signaling, set their bool
+  ask humats [set signaling? (Boolean-Integer-Conversion Ready-To-Signal?) ]
+
+  ; for the others, get to signaling
+  ask humats with [signaling? = GLOBAL-BOOLEAN-TRUE] [ Signal-Humat ]
+end
+
+; Reports whether or not this humat wants to signal right now
+to-report Ready-To-Signal?
+  ; the probability of communication can be tweaked globally (1 by default)
+  let COMM-P global-communication-p
+  if Current-Dissonance > dissonance-tolerance [
+    ; we flip a coin to decide if we signal or inquire if we face both dilemmas
+    report (dilemma-status = "social" 
+      or (dilemma-status = "both" and (random 2) = 1))
+      and random-float 1.0 <= COMM-P ]
+  
+  set signaling? GLOBAL-BOOLEAN-FALSE
+  ; in all other cases, we just ignore any dilemma
+  report false
+end
+
+; Signal procedure for HUMATS
+to Signal-Humat
+  ; select the first representation from the (sorted) list as signal target
+  let signaled-humat Select-Signal-Target-Humat
+
+  ; get a reference to the signaled alter (not its representation)
+  let alter (humat (first signaled-humat))
+
+  ; update alter's representation of ego
+  ask alter [ Signaled-Alter-Update-Representation ]
+  
+  ; update ego's representation
+  ; please note that alter's representation of the signaled alter is only
+  ; updated to the extent of the alter's new decision about the BA (items 3,4,5)
+  set signaled-humat 
+    Updated-Alter-Representation-When-Signaling alter signaled-humat
+  
+  ; update ego's representation of the signaled alter
+  set alter-representation-list 
+    (Find-And-Replace-Alter-Representation
+      alter-representation-list
+      signaled-humat)
+
+  ; update the signaling counter
+  set #signaling #signaling + 1
+
+  ; update ego's HUMAT attributes
+  ; NOTE: in the initial implementation, the dilemma-status is not updated at
+  ; this point
+  Update-Humat
+end
+
+; Procedure to update the alter-representations for an alter that is getting
+; signaled by a given signaling humat
+to Signaled-Alter-Update-Representation
+  ; increment number of signals received
+  set #signaled #signaled + 1
+
+  ; essentially an alias to avoid confusing terminology
+  ; NOTE: myself is a reference to the agent that <ask>ed for this procedure
+  ; in this case myself is therefore the signaling agent
+  let signaling-alter myself
+
+  ; Get the representation of the signaling alter
+  let signaling-representation 
+    (Find-Alter-Representation signaling-alter alter-representation-list)
+
+  ; update the values of the representation
+  set signaling-representation
+    (Updated-Alter-Representation-When-Signaled signaling-alter signaling-representation)
+
+  ; add the updated value to the list of representations (in the correct position)
+  ; long-term memory - please note that alter's representation of the signaling
+  ; ego only influences the update on social satisfaction, storing information
+  ; other than about the BA (items 3, 4 aand 5) does not influence anything
+  set alter-representation-list 
+    (Find-And-Replace-Alter-Representation
+      alter-representation-list
+      signaling-representation)
+
+  ; update motive importances based on the signal
+  Signaled-Alter-Update-Motive-Satisfaction signaling-alter signaling-representation
+
+  ; update the humat attributes of the signaled humat
+  ; (self, i.e. the humat on which this procedure was called)
+  Update-Humat
+end
+
+; HUMAT procedure. Selects the preferred signal target based on the sorted
+; alter-representations list
+to-report Select-Signal-Target-Humat
+  ; prior to the sort, filter out critical nodes as they are not intended to be
+  ; signal/inquire targets
+  ; report the top alter in the sorted signaling list
+  report first Sorted-Signal-List (Filter-Non-Humats alter-representation-list)
+end
+
+; Reports the alter-representation list, sorted by signaling preference
+to-report Sorted-Signal-List [ local-alter-representation-list ]
+  let GULLIBILITY SIGNALING-PERSUASION-ITEM
+  ; the signal list is the list of alters sorted by signaled status, difference
+  ; in opinion and gullibility (i.e. ego's ability to persuade a given alter)
+  ; in that order
+  report sort-by
+    ; the anonymous reporter reports true if lhs > rhs
+    [
+      [lhs rhs] ->
+      ; prefer someone we have not signaled
+      item SIGNALED?-ITEM lhs < item SIGNALED?-ITEM rhs 
+      or (
+        item SIGNALED?-ITEM lhs = item SIGNALED?-ITEM rhs 
+        ; prefer someone who has a different behaviour
+        and item SAME?-ITEM lhs < item SAME?-ITEM rhs)
+      or (item SIGNALED?-ITEM lhs = item SIGNALED?-ITEM rhs
+        and item SAME?-ITEM lhs = item SAME?-ITEM rhs
+        ; prefer someone who we can influence more easily
+        and item GULLIBILITY lhs > item GULLIBILITY rhs)
+    ]
+    local-alter-representation-list
+end
+
+; NOTE: according to Jager 2024 (WIP) both satisfaction values should be
+; updated here, but this is not exactly how it works in the original
+; Groningen model.
+to Signaled-Alter-Update-Motive-Satisfaction [ signaling-alter signaling-representation ]
+  ; update the satisfactions for a
+  set motive-satisfaction-a-list 
+    (Updated-Satisfaction-List
+      motive-satisfaction-a-list
+      [ motive-satisfaction-a-list ] of signaling-alter
+      item SIGNAL-PERSUASION-A-ITEM signaling-representation)
+
+  ; update the satisfactions for b
+  set motive-satisfaction-b-list 
+    (Updated-Satisfaction-List
+      motive-satisfaction-b-list
+      [ motive-satisfaction-b-list ] of signaling-alter
+      item SIGNAL-PERSUASION-B-ITEM signaling-representation)
+end

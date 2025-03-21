@@ -1,0 +1,78 @@
+
+; Custom output routine. Writes to the command tray by default and will write to
+; the output window if a global verbose variable is set. Takes a single argument
+to Output-Print-Verbose [ word-arg ]
+  if shush = 0 or not shush [
+  ; conditionally print to output window
+  if verbose [ output-print word-arg ]
+  ; always print to command center
+  print word-arg
+  ]
+end
+
+; outputs to both the regular window and the command center
+to Output-Print-Regular [ word-arg ]
+  if shush = 0 or not shush [
+  output-print word-arg
+  print word-arg]
+end
+
+; outputs to both the regular window and the command center, but adds the 
+; context as well as quoted strings in the argument
+to Output-Print-Quote-Strings-Regular [ context word-arg ]
+  if shush = 0 or not shush [
+  output-type context
+  output-write word-arg
+  output-type "\n"
+  type context
+  write word-arg
+  type "\n"
+  ]
+end
+
+; outputs conditionally to the regular window and the command center, but adds 
+; the agent context as well as quoted strings
+to Output-Print-Quote-Strings-Verbose [ context word-arg ]
+  if shush = 0 or not shush [
+  if verbose [
+    output-type context
+    output-write word-arg
+    output-type "\n"
+  ]
+  type context
+  write word-arg
+  type "\n"
+  ]
+end
+
+; Writes a summary of the humat to the command window or output window
+; depending on whether verbose output is used.
+to Output-Humat-Summarize-Self
+  Output-Print-Verbose (word "I am humat (" who "): " id-in-dataset)
+  Output-Print-Verbose (word "My current dilemma state is " dilemma-status)
+  Output-Print-Verbose (word "I have selected option " current-alternative)
+  Output-Print-Verbose (word "My aspiration-level is " aspiration-level)
+  Output-Print-Verbose (word "My importances are: " importance-list)
+  Output-Print-Verbose (word "My dissonance tolerance is: " dissonance-tolerance)
+  Output-Print-Verbose (word "My satisfactions (A) are: " motive-satisfaction-a-list)
+  Output-Print-Verbose (word "My satisfactions (B) are: " motive-satisfaction-b-list)
+  Output-Print-Verbose (word "My evaluation/dissonances are A: "
+    precision Calculate-Evaluation "A" 2 "/" precision dissonance-value-a 2
+    " and B: "
+    precision Calculate-Evaluation "B" 2 "/" precision dissonance-value-b 2
+  )
+  Output-Print-Verbose (word "I signaled " #signaling " times")
+  Output-Print-Verbose (word "I inquired " #inquiring " times")
+  Output-Print-Verbose (word "I was signaled " #signaled " times")
+  Output-Print-Verbose (word "I was inquired " #inquired " times")
+end
+
+; Alias, to save some keystrokes
+to OPHS
+  Output-Humat-Summarize-Self
+end
+
+; Alias, to save some keystrokes
+to OPV [ arg ]
+  Output-Print-Verbose arg
+end

@@ -1,0 +1,146 @@
+to Inquire
+  ;here conceptualising dissonance reduction strategies depending on dilemmas a HUMAT is experiencing
+  ;during inquiring information flows uni-directionally from the alter, who was giving advice to the ego, who was asking for advice
+  ;activating dissonance reduction strategies - this is pre-action dissonance reduction; post action dissonnace reduction is when the action is taken - in Groningen case this is a longer process of making up your mind before the vote; its after the vote when post-action dissonance reduction will have to take place if the vote did not go your way
+  ; INQUIRING
+  ;inquire strategy - seek information in social network to reduce cognitive dissonance via altering EGOs' knowledge structures
+  ;update ego's representation of the inquired alter
+  
+  ; for all humats that are not inquiring, set their bool
+  ask humats [set inquiring? (Boolean-Integer-Conversion Ready-To-Inquire?)]
+
+  ; for the others, get to inquiring
+  ask humats with [inquiring? = GLOBAL-BOOLEAN-TRUE] [ Inquire-Humat ]
+end
+
+; Reports true if this humat wants to inquire right now
+to-report Ready-To-Inquire?
+  ; the probability of communication can be tweaked globally (1 by default)
+  let COMM-P global-communication-p
+  ; we only inquire if we're not already signaling
+  ; NOTE: This assumes that the signaling handling happens first
+  if Current-Dissonance > dissonance-tolerance
+    and not (signaling? = GLOBAL-BOOLEAN-TRUE) [
+    report (dilemma-status = "non-social" or dilemma-status = "both")
+      and random-float 1.0 <= COMM-P ]
+  
+  set inquiring? GLOBAL-BOOLEAN-FALSE
+  report false
+end
+
+; Inquiring procedure for HUMATs
+to Inquire-Humat
+  ; select alter to inquire with
+  let inquired-humat Select-Inquiry-Target-Humat
+
+  ; get a reference to the inquired alter (not its representation)
+  let alter (humat (first inquired-humat))
+
+  ; update alters representation of ego
+  ask alter [ Inquired-Alter-Update-Representation ]
+
+  ; update ego's representation of alter
+  set inquired-humat
+    Updated-Alter-Representation-When-Inquiring alter inquired-humat
+
+  ; update ego's representation of the inquired alter
+  set alter-representation-list 
+    (Find-And-Replace-Alter-Representation
+      alter-representation-list
+      inquired-humat)
+
+  ; update ego's satisfaction
+  Update-Satisfactions-Inquiring-Ego alter inquired-humat
+
+  ; update the inquiring counter
+  set #inquiring #inquiring + 1
+
+  ; update ego's state
+  ; NOTE: in the initial implementation, the dilemma-status is not updated at
+  ; this point
+  Update-Humat
+end
+
+; Procedure to update the alter-representations for an alter that is getting
+; inquired by a given signaling humat
+to Inquired-Alter-Update-Representation
+  ; increment the number of inquiries received
+  set #inquired #inquired + 1
+
+  ; essentially an alias to avoid confusing terminology
+  ; NOTE: myself is a reference to the agent that <ask>ed for this procedure
+  ; in this case myself is therefore the inquiring agent
+  let inquiring-alter myself
+
+  ; Get the representation of the inquiring alter
+  let inquiring-representation 
+    (Find-Alter-Representation inquiring-alter alter-representation-list)
+
+  ; update the values of the representation
+  set inquiring-representation
+    (Updated-Alter-Representation-When-Inquired
+       inquiring-alter inquiring-representation)
+
+  ; add the updated value to the list of representations (in the correct position)
+  ; long-term memory - please note that alter's representation of the signaling
+  ; ego only influences the update on social satisfaction, storing information
+  ; other than about the BA (items 3, 4 aand 5) does not influence anything
+  set alter-representation-list 
+    (Find-And-Replace-Alter-Representation
+      alter-representation-list
+      inquiring-representation)
+
+  ; update the humat attributes of the inquired humat
+  ; (self, i.e. the humat on which this procedure was called)
+  Update-Humat
+end
+
+; Reports the preferred alters representation for inquiring
+to-report Select-Inquiry-Target-Humat
+  ; prior to the sort, filter out critical nodes as they are not intended to be
+  ; signal/inquire targets
+  ; report the top alter in the sorted signaling list
+  report first Sorted-Inquiry-List (Filter-Non-Humats alter-representation-list)
+end
+
+; Reports the alter-representation list sorted by inquiring preference
+to-report Sorted-Inquiry-List [ local-alter-representation-list ]
+  let EXPERTISE INQUIRING-PERSUASION-ITEM
+  ; the inquire list is the list of alters, sorted by inquiry status,
+  ; difference in opinion and persuasiveness of the alter in that order
+  report sort-by
+    ; the anonymous reporter reports true if lhs > rhs
+    [
+      [lhs rhs] ->
+      ; prefer someone who has not been inquired with
+      item INQUIRED?-ITEM lhs < item INQUIRED?-ITEM rhs 
+      or (
+        item INQUIRED?-ITEM lhs = item INQUIRED?-ITEM rhs 
+        ; prefer someone who has the same choice as us
+        and item SAME?-ITEM lhs > item SAME?-ITEM rhs)
+      or (
+          item INQUIRED?-ITEM lhs = item INQUIRED?-ITEM rhs
+        and
+          item SAME?-ITEM lhs = item SAME?-ITEM rhs
+        and
+          ; prefer someone who we trust more
+          item EXPERTISE lhs > item EXPERTISE rhs)
+    ]
+    local-alter-representation-list
+end
+
+to Update-Satisfactions-Inquiring-Ego [ inquired-alter inquired-representation ]
+  ; update the satisfactions for a
+  set motive-satisfaction-a-list 
+    (Updated-Satisfaction-List
+      motive-satisfaction-a-list
+      [ motive-satisfaction-a-list ] of inquired-alter
+      item INQUIRING-PERSUASION-A-LIST-ITEM inquired-representation)
+
+  ; update the satisfactions for b
+  set motive-satisfaction-b-list 
+    (Updated-Satisfaction-List
+      motive-satisfaction-b-list
+      [ motive-satisfaction-b-list ] of inquired-alter
+      item INQUIRING-PERSUASION-B-LIST-ITEM inquired-representation)
+end

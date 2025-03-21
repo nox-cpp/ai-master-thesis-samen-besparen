@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE experiments SYSTEM "behaviorspace.dtd">
+<experiments>
+  <experiment name="barebones" repetitions="100" runMetricsEveryStep="true">
+    <setup>
+      setup
+      set output-folder "$EXPERIMENT_OUTPUT_DIR"
+      set global-random-seed Set-And-Report-Seed
+    </setup>
+    <go>go</go>
+    <postRun>
+      Write-All-Humats-To-File (word output-folder "/world_states/" "humats_" behaviorspace-experiment-name "_" behaviorspace-run-number "_" Date-String ".csv")
+    </postRun>
+    <postExperiment>
+      export-output (word output-folder "/output/nl_output" behaviorspace-experiment-name ".txt")
+    </postExperiment>
+    <timeLimit steps="200"/>
+    <metric>Optin-Count</metric>
+    <metric>Optout-Count</metric>
+    <metric>Household-Count</metric>
+    <metric>Social-Dilemma-Count</metric>
+    <metric>Non-Social-Dilemma-Count</metric>
+    <metric>Non-Dilemma-Count</metric>
+    <metric>True-Social-Dilemma-Count</metric>
+    <metric>True-Non-Social-Dilemma-Count</metric>
+    <metric>True-Dual-Dilemma-Count</metric>
+    <metric>Sum-Population-Evaluation</metric>
+    <metric>Sum-Population-Evaluation-With-A</metric>
+    <metric>Sum-Population-Evaluation-With-B</metric>
+    <metric>Average-Population-Evaluation</metric>
+    <metric>Average-Sub-Population-Evaluation-With-A</metric>
+    <metric>Average-Sub-Population-Evaluation-With-B</metric>
+    <metric>Average-Population-Expected-Satisfaction</metric>
+    <metric>Average-Sub-Population-Expected-Satisfaction-With-B</metric>
+    <metric>Average-Sub-Population-Expected-Satisfaction-With-A</metric>
+    <metric>Variance-Population-Evaluation</metric>
+    <metric>Variance-Sub-Population-Evaluation-With-A</metric>
+    <metric>Variance-Sub-Population-Evaluation-With-B</metric>
+    <metric>Variance-Population-Expected-Satisfaction</metric>
+    <metric>Variance-Sub-Population-Expected-Satisfaction-With-B</metric>
+    <metric>Variance-Sub-Population-Expected-Satisfaction-With-A</metric>
+    <metric>High-Satisfaction-Count</metric>
+    <metric>Positive-Satisfaction-Count</metric>
+    <metric>Negative-Satisfaction-Count</metric>
+    <metric>Low-Satisfaction-Count</metric>
+    <metric>Fully-Convinced-Count</metric>
+    <metric>Almost-Convinced-Count</metric>
+    <metric>Partially-Convinced-Count</metric>
+    <metric>High-Satisfaction-Count-A</metric>
+    <metric>Positive-Satisfaction-Count-A</metric>
+    <metric>Negative-Satisfaction-Count-A</metric>
+    <metric>Low-Satisfaction-Count-A</metric>
+    <metric>Fully-Convinced-Count-A</metric>
+    <metric>Almost-Convinced-Count-A</metric>
+    <metric>Partially-Convinced-Count-A</metric>
+    <metric>High-Satisfaction-Count-B</metric>
+    <metric>Positive-Satisfaction-Count-B</metric>
+    <metric>Negative-Satisfaction-Count-B</metric>
+    <metric>Low-Satisfaction-Count-B</metric>
+    <metric>Fully-Convinced-Count-B</metric>
+    <metric>Almost-Convinced-Count-B</metric>
+    <metric>Partially-Convinced-Count-B</metric>
+    <metric>Report-Seed</metric>
+    <metric>Detect-Convergence?</metric>
+    <metric>Total-Communications</metric>
+    <metric>Total-Inquiries</metric>
+    <metric>Total-Signals</metric>
+    <metric>Average-Communications</metric>
+    <metric>Average-Signals</metric>
+    <metric>Average-Communications</metric>
+    <metric>Variance-Communications</metric>
+    <metric>Variance-Signals</metric>
+    <metric>Variance-Communications</metric>
+    <metric>Total-Communications-A</metric>
+    <metric>Total-Inquiries-A</metric>
+    <metric>Total-Signals-A</metric>
+    <metric>Average-Communications-A</metric>
+    <metric>Average-Signals-A</metric>
+    <metric>Average-Communications-A</metric>
+    <metric>Variance-Communications-A</metric>
+    <metric>Variance-Signals-A</metric>
+    <metric>Variance-Communications-A</metric>
+    <metric>Total-Communications-B</metric>
+    <metric>Total-Inquiries-B</metric>
+    <metric>Total-Signals-B</metric>
+    <metric>Average-Communications-B</metric>
+    <metric>Average-Signals-B</metric>
+    <metric>Average-Communications-B</metric>
+    <metric>Variance-Communications-B</metric>
+    <metric>Variance-Signals-B</metric>
+    <metric>Variance-Communications-B</metric>
+    <enumeratedValueSet variable="ui-population-mode">
+      <value value="&quot;Filebased&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="agent-file-path">
+      <value value="&quot;$GP_OUTPUT_DATA_FOLDER/experiments/barebones/populations/default_agents.csv&quot;"/>
+      <value value="&quot;$GP_OUTPUT_DATA_FOLDER/experiments/barebones/populations/imputed_agents.csv&quot;"/>
+      <value value="&quot;$GP_OUTPUT_DATA_FOLDER/experiments/barebones/populations/ipf_agents.csv&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="verbose">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ui-toggle-procedural">
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ui-network-type">
+      <value value="&quot;preferential&quot;"/>
+      <value value="&quot;small-world&quot;"/>
+      <value value="&quot;random&quot;"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ui-campaign-enabled">
+      <value value="true"/>
+      <value value="false"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="shush">
+      <value value="true"/>
+    </enumeratedValueSet>
+    <enumeratedValueSet variable="ui-visualization-mode">
+      <value value="&quot;standard&quot;"/>
+    </enumeratedValueSet>
+  </experiment>
+</experiments>

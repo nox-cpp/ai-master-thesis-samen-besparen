@@ -1,0 +1,15 @@
+; This file contains the routines required to set up validation cases that aim
+; to demonstrate the validity of the model
+
+; This simulation is set up such that it converges to all agents reaching the
+; same decision in the end
+to Setup-Validation-One
+  Setup-Generic-Basis
+end
+
+; This simulation is set up such that two agents maintain a dilemma state in the
+; end and one other agent is satisfied
+to Setup-Validation-Two
+  Setup-Generic-Basis
+end
+

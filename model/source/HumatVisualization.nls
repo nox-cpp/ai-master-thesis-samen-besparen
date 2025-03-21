@@ -1,0 +1,167 @@
+; Updates the HUMAT visuals reflecting their current state
+to Update-Humat-Visualization
+  ;  reset the label (it may or may not be overridden)
+  set label ""
+  (ifelse 
+    ui-visualization-mode = "standard" 
+    or ui-visualization-mode = "dilemma-status" [ 
+      Humat-Dilemma-Color-Visualization
+      Humat-Communication-Label
+    ]
+    ; satisfaction color
+    ui-visualization-mode  = "current-satisfaction" [ Humat-Current-Satisfaction-Color-Visualization ]
+    ; cognitive dissonance
+    ui-visualization-mode  = "current-dissonance" [ Humat-Current-Dissonance-Color-Visualization ]
+    ; communication frequencies
+    ui-visualization-mode  = "times-signaled" [ Humat-Signal-Frequency-Color-Visualization ]
+    ui-visualization-mode  = "times-inquired" [ Humat-Inquire-Frequency-Color-Visualization ]
+    ; evaluation colors
+    ui-visualization-mode = "a-evaluation" [ Humat-A-Evaluation-Color-Visualization ]
+    ui-visualization-mode = "b-evaluation" [ Humat-B-Evaluation-Color-Visualization ]
+  )
+  Humat-Alternative-Shape-Visualization
+end
+
+; Updates the color to reflect the agent's current dilemma status
+to Humat-Dilemma-Color-Visualization
+  (ifelse 
+      dilemma-status = "none" [set color grey]
+      dilemma-status = "social" [set color blue]
+      dilemma-status = "non-social" [set color violet]
+      dilemma-status = "both" [
+        ; if agents are experiencing both dilemmas, use a different shade
+        (ifelse (signaling? = GLOBAL-BOOLEAN-TRUE)
+        [ set color sky ]
+        [ set color magenta ])]
+      ; this is an error state
+      [        
+        set color red
+        Output-Print-Regular "An agent is in an erroneous state"
+        Output-Print-Verbose (list dilemma-status who)
+      ]
+  )
+end
+
+; Updates the shape to reflect the HUMATs selected alternative
+to Humat-Alternative-Shape-Visualization
+  (ifelse
+    current-alternative = "A" [ set shape "circle"]
+    current-alternative = "B" [ set shape "square"]
+    ; this is an error state
+    [
+      set shape "triangle"
+      Output-Print-Regular "An agent is in an erroneous state"
+      Output-Print-Verbose (list current-alternative who)
+    ]
+  )
+end
+
+; Visualizes humats using their current satisfaction (i.e. evaluation of their)
+; currently selected alternative.
+to Humat-Current-Satisfaction-Color-Visualization
+  let abs-evaluation abs overall-evaluation
+  set color Humat-Evaluation-Color abs-evaluation
+end
+
+to Humat-Current-Dissonance-Color-Visualization
+  let dissonance Current-Dissonance
+  ifelse dissonance < dissonance-tolerance [
+    ; if the dissonance is within tolerance, show as grey tint
+    set color 2 + 4 * dissonance
+  ]
+  ; tolerance exceeded, shown as yellow
+  [
+    set color 42 + 4 * dissonance
+  ]
+end
+
+to Humat-Signal-Frequency-Color-Visualization
+  let max-summed-communications vis-maximum-signal-communications
+  let summed-communications (#signaling + #signaled)
+  ; prevent division by 0
+  if max-summed-communications = 0 [ set max-summed-communications 1 ] 
+  set color 130 + (9.9 * summed-communications) / max-summed-communications
+  if (ui-n-pop < 50) [
+    set label (sentence #signaling "/" #signaled)]
+end
+
+to Humat-Inquire-Frequency-Color-Visualization
+  let max-summed-communications vis-maximum-inquire-communications
+  let summed-communications (#inquiring + #inquired)
+  ; prevent division by 0
+  if max-summed-communications = 0 [ set max-summed-communications 1 ] 
+  set color 80 + (9.9 * summed-communications) / max-summed-communications
+  if (ui-n-pop < 50) [
+    set label (sentence #inquiring "/" #inquired)]
+end
+
+to Humat-A-Evaluation-Color-Visualization
+  set color Humat-Evaluation-Color Calculate-Evaluation "A"
+end
+
+to Humat-B-Evaluation-Color-Visualization
+  set color Humat-Evaluation-Color Calculate-Evaluation "B"
+end
+
+; computes the color corresponding to the evaluation
+; humats are colored from red (minimum evaluation) to green (maximum evaluation)
+; middle value is white, darker shades represent extremes.
+; Values near 0 (neutral) receive a shade of grey
+to-report Humat-Evaluation-Color [ evaluation-value ]
+  ; if the evaluation is near zero, set the base color to grey instead
+  let base-color 0
+  let ZERO-MARGIN 0.1
+  ifelse (abs evaluation-value < ZERO-MARGIN) [ set base-color 2 ]
+  ; set the base color according to the sign
+  [ set base-color (ifelse-value evaluation-value < 0 [ 17 ] [ 52 ]) ]
+   
+  ; max of 4 shades 'brighter' than the base
+  let lightness-mod 4 * (abs evaluation-value)
+  report base-color + lightness-mod
+end
+
+; Setup the critical node visualization (done once)
+to Critical-Node-Visualization [ crit-color x-coordinate y-coordinate ]
+  set shape "house"
+  set size 20
+  set xcor x-coordinate
+  set ycor y-coordinate
+  set color crit-color
+end
+
+; Initializes the visual attributes of the critical nodes in the simulation.
+; Critical nodes are represented in the top-right corner in rows and are 
+; assigned a color from the NetLogo spectrum starting with green.
+to Set-Initial-Critical-Node-Visualization
+  let x-coordinate -320
+  let y-coordinate 180
+  let crit-color lime
+  foreach sort critical-nodes [
+    node ->
+    ; apply the visualization
+    ask node [
+       Critical-Node-Visualization crit-color x-coordinate y-coordinate ]
+
+    ; set the color and coordinates for the next node
+    set y-coordinate (y-coordinate + 20)
+    ; if we run out of space on top, go to the next 'line'
+    if x-coordinate > max-pxcor [
+      set x-coordinate 180
+      set y-coordinate (y-coordinate - 20)
+    ]
+    ; cycle through colors
+    set crit-color wrap-color (crit-color + 10)
+    if crit-color = lime [
+      ; shift the color slightly if we've gone around
+      set crit-color (crit-color - 2)
+    ]
+  ]
+end
+
+to Humat-Communication-Label
+  set label (
+    ifelse-value signaling? = GLOBAL-BOOLEAN-TRUE 
+      [ "S" ]
+      [ ifelse-value (inquiring? = GLOBAL-BOOLEAN-TRUE) [ "I" ] [ "" ] ]
+     )
+end

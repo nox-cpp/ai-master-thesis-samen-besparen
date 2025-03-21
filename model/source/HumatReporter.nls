@@ -1,0 +1,198 @@
+;;;;;;;;;;;;;;;;;;;;;;;;
+;; Humat - Reporters ;;;
+;;;;;;;;;;;;;;;;;;;;;;;;
+
+;changed
+to-report Alter-Guess-Behaviour? [actual-behavior]
+  let alt-behaviours list ("A") ("B")
+  set alt-behaviours remove actual-behavior alt-behaviours
+  let result one-of alt-behaviours
+  if random-float 1.0 <= 0.8 [set result actual-behavior]
+  report result
+end
+
+to-report Random-Normal-Trunc [mid dev mmin mmax]
+  ; creating a trunc normal function to be used for tuncating the normal distribution between mmin and mmax values
+  ; good for now, but the goeal would be to get to the normal from beta (using gamma as a start)
+  let result random-normal mid dev
+  if result < mmin or result > mmax
+  [report Random-Normal-Trunc mid dev mmin mmax]
+  report result
+end
+
+to-report Normalized-Min-Max [norm-variable min-old max-old min-new max-new]
+  let norm min-new + (((norm-variable - min-old) * (max-new - min-new)) / (max-old - min-old))
+  report norm
+end
+
+; Reporter that compares two alternatives for equivalence
+; NOTE: we avoid using the regular equivalence operator for this so we can use
+; the integer (i.e. sortable) boolean
+to-report Same-Alternatives? [ego-val alter-val]
+  ifelse ego-val = alter-val
+    ; is the same alternative
+    [report GLOBAL-BOOLEAN-TRUE] 
+    ; is a different alternative
+    [report GLOBAL-BOOLEAN-FALSE] 
+end
+
+to-report Need-Similarity [need-evaluation-BA-ego need-evaluation-BA-alter need-importance-ego need-importance-alter] ; weighing of alter's similarity of needs, applicable to each group of needs for each BA
+  ; can take a max value of 0,4 - if two agents value the same needs to the same extent, the influencing agent affects the influenced agent to a max degree of 40% (new value is 60% influnced agent's and 40% influencing agent).
+  ; if two agents don't find the same needs important, the influencing agent does not affect the influenced agent
+  ; The if-else makes it so that HUMATS influence each other only if their need
+  ; evaluations share the same sign. If they do, the similarity is calculated
+  ; as a fraction of 1 minus the absolute difference between need importances.
+  ; That is to say, if the HUMATs consider needs similarly important, they can
+  ; influence eachother more.
+  ; If ego has an evaluation of 0, it is neutral, but will still take the alter
+  ; opinion into account. Otherwise, it would not be possible for alters to
+  ; influence the opinion of a neutral humat ever.
+  let SIMILARITY-FACTOR 0.4
+  ifelse
+  (need-evaluation-BA-ego >= 0 and need-evaluation-BA-alter > 0) or
+  (need-evaluation-BA-ego <= 0 and need-evaluation-BA-alter < 0)
+  [report SIMILARITY-FACTOR * (1 - abs(need-importance-ego - need-importance-alter))]
+  [report 0]
+end
+
+; Reports the list of similarities of the given evaluation/importance pair
+to-report Need-Similarity-List [ need-evaluation-ego need-evaluation-alter need-importance-ego need-importance-alter ]
+  ; loop over each motive and calculate the similarity
+  report map [index -> Need-Similarity
+        (item index need-evaluation-ego)
+        (item index need-evaluation-alter)
+        (item index need-importance-ego)
+        (item index need-importance-alter)] (range 0 motive-count)
+end
+
+; boolean conversion (integer booleans are used for sorting)
+to-report Boolean-Integer-Conversion [ boolean-value ]
+  report (
+    ifelse-value boolean-value [ GLOBAL-BOOLEAN-TRUE ] [ GLOBAL-BOOLEAN-FALSE ])
+end
+
+; filter out non-humat agents from the representation list
+to-report Filter-Non-Humats [ representation-list ]
+  ; prior to the sort, filter out critical nodes as they are not intended to be
+  ; signal/inquire targets
+  report filter 
+    [ representation -> is-humat? turtle item WHO-ITEM representation ] 
+    representation-list
+end
+
+; HUMAT reporter that gives the expected satisfaction (prime version) for the
+; given alternative
+to-report Expected-Satisfaction-For-Alternative [ alternative ]
+  let sum-evaluation (reduce + Calculate-Evaluation-List alternative)
+  ; this is a degenerate situation, but it can happen in theory
+  if importance-sum = 0.0 [report 0.0]
+  report sum-evaluation / importance-sum
+end
+
+; HUMAT reporter that gives the expected satisfaction (prime version) for the
+; currently selected alternative
+to-report Current-Expected-Satisfaction
+  report Expected-Satisfaction-For-Alternative current-alternative
+end
+
+; TODO: Use consistent terminology for evaluation/satisfaction
+; Satisfaction category reporters
+; NOTE: that this uses the prime version of the satisfaction computation
+to-report High-Satisfaction?
+  report Current-Expected-Satisfaction > 0.5 
+end
+
+to-report Positive-Satisfaction?
+  report Current-Expected-Satisfaction > 0.0
+end
+
+to-report Negative-Satisfaction?
+  report Current-Expected-Satisfaction <= 0
+end
+
+to-report Low-Satisfaction?
+  report Current-Expected-Satisfaction < -0.5
+end
+
+; Evaluation measures
+to-report High-Evaluation?
+  report overall-evaluation > 0.5 
+end
+
+to-report Positive-Evaluation?
+  report overall-evaluation > 0.0
+end
+
+to-report Negative-Evaluation?
+  report overall-evaluation <= 0
+end
+
+to-report Low-Evaluation?
+  report overall-evaluation < -0.5
+end
+
+; Reports true if cognitive dissonance exceeds tolerance
+to-report Excess-Dissonance?
+  report Current-Dissonance > dissonance-tolerance
+end
+
+; Dilemma status reporters
+to-report Social-Dilemma?
+  report dilemma-status = "social" or dilemma-status = "both"
+end
+
+to-report Non-Social-Dilemma?
+  report dilemma-status = "non-social" or dilemma-status = "both"
+end
+
+to-report Non-Dilemma?
+  report dilemma-status = "none"
+end
+
+; Reports true for agents that have a social dilemma (but not a non-social 
+; one!) and also experience a dissonance that exceeds their threshold
+to-report True-Social-Dilemma?
+  report Excess-Dissonance? and dilemma-status = "social"
+end
+
+; Reports true for agents that experience a non-social dilemma (but not a
+; social one!) and also experience a dissonance that exceeds their threshold
+to-report True-Non-Social-Dilemma?
+  report Excess-Dissonance? and dilemma-status = "non-social"
+end
+
+; Reports true for agents that experience a dual dilemma and also 
+; experience a dissonance that exceedes their threshold
+to-report True-Dual-Dilemma?
+  report Excess-Dissonance? and dilemma-status = "both"
+end
+
+to-report Opt-In?
+  report current-alternative = "A"
+end
+
+; Reports if the difference in expected satisfactions exceeds a threshold
+; Satisfaction based on prime version of satisfaction
+to-report Significant-Preference?
+  let threshold 0.1
+  let diff abs (
+    Expected-Satisfaction-For-Alternative "A" 
+    - Expected-Satisfaction-For-Alternative "B")
+  report diff > threshold
+end
+
+; Composite status measures
+to-report Fully-Convinced?
+  report Opt-In? and (not Excess-Dissonance?) and High-Satisfaction? and 
+    Significant-Preference?
+end
+
+to-report Almost-Convinced?
+  report Opt-In? and (not Excess-Dissonance?) and High-Satisfaction? and 
+    not Significant-Preference?
+end
+
+to-report Partially-Convinced?
+  report Opt-In? and High-Satisfaction? and Significant-Preference? and
+    Excess-Dissonance?
+end

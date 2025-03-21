@@ -1,0 +1,475 @@
+; This file contains reporters that are intended for use in BehaviourSpace
+; experiments.
+
+; Reports the number of agents with alternative "A"
+to-report Optin-Count
+  report count humats with [ current-alternative = "A" ]
+end
+
+; Reports the number of agents with alternative "B"
+to-report Optout-Count
+  report count humats with [ current-alternative = "B" ]
+end
+
+; Reports the total number of humats (effectively N - |critical-nodes|)
+to-report Household-Count
+  report count humats
+end
+
+; TODO: group-wise dilemma counts
+; Reports the number of agents that could experience a social dilemma, not
+; considering their dissonance.
+to-report Social-Dilemma-Count
+  report count humats with [ Social-Dilemma? ]
+end
+
+; Reports the number of agents that could experience a non-social dilemma, not
+; considering their dissonance.
+to-report Non-Social-Dilemma-Count
+  report count humats with [ Non-Social-Dilemma? ]
+end
+
+; Reports the number of agents that non-dilemma
+to-report Non-Dilemma-Count
+  report count humats with [ Non-Dilemma? ]
+end
+
+; Reports the number of agents that have a social dilemma (but not a non-social 
+; one!) and also experience a dissonance that exceeds their threshold
+to-report True-Social-Dilemma-Count
+  report count humats with [ True-Social-Dilemma? ]
+end
+
+; Reports the number of agents that experience a non-social dilemma (but not a
+; social one!) and also experience a dissonance that exceeds their threshold
+to-report True-Non-Social-Dilemma-Count
+  report count humats with [ True-Non-Social-Dilemma? ]
+end
+
+; Reports the number of agents that experience a dual dilemma and also 
+; experience a dissonance that exceedes their threshold
+to-report True-Dual-Dilemma-Count
+  report count humats with [ True-Dual-Dilemma? ]
+end
+
+; Reports the summed Evaluation with the current alternative for all agents
+to-report Sum-Population-Evaluation
+  report sum [ overall-evaluation ] of humats
+end
+
+; Reports the summed Evaluation of agents with the current alternative A
+to-report Sum-Population-Evaluation-With-A
+  report sum [ overall-evaluation ] of humats with [ current-alternative = "A" ]
+end
+
+; Reports the summed Evaluation of agents with the current alternative B
+to-report Sum-Population-Evaluation-With-B
+  report sum [ overall-evaluation ] of humats with [ current-alternative = "B" ]
+end
+
+; Reports the average evaluation of the current alternative for each agent
+to-report Average-Population-Evaluation
+  report Sum-Population-Evaluation / count humats
+end
+
+; Reports the average evaluation of the current alternative for each agent with
+; current alternative A
+to-report Average-Sub-Population-Evaluation-With-A
+  let a-humats count humats with [ current-alternative = "A" ]
+  report ifelse-value a-humats = 0 [0] [Sum-Population-Evaluation-With-A / a-humats]
+    
+end
+
+; Reports the average evaluation of the current alternative for each agent with
+; current alternative B
+to-report Average-Sub-Population-Evaluation-With-B
+  let b-humats count humats with [ current-alternative = "B" ]
+  report ifelse-value b-humats = 0 [0] [Sum-Population-Evaluation-With-B / b-humats]
+end
+
+; Writes selected attributes to file for each HUMAT in .csv format
+; HUMAT-procedure
+to-report Write-Agent-State-To-CSV-Row
+  report (list 
+    id-in-dataset current-alternative
+    dilemma-status overall-evaluation
+    dissonance-value-a dissonance-value-b
+    expected-satisfaction-a expected-satisfaction-b)
+end
+
+; Writes the HUMAT population in its entirety to file, with select attributes
+to Write-All-Humats-To-File [ file-path ]
+  ; fail gracefully
+  if count humats = 0 [
+    error "Cannot write a non-existent population to file"
+    stop
+  ]
+  let header (list 
+    "id-in-dataset" "current-alternative"
+    "dilemma-status" "overall-evaluation" 
+    "dissonance-value-a" "dissonance-value-b"
+    "expected-satisfaction-a" "expected-satisfaction-b")
+
+  ; map each agent to a row
+  let data [ Write-Agent-State-To-CSV-Row ] of humats
+
+  ; Writes the data to the CSV file with the given header
+  csv:to-file file-path fput header data
+end
+
+; Gets a filename-friendly date string
+; This assumes that the date-and-time format is always fixed-width (which it should be)
+to-report Date-String
+  report substring date-and-time 16 length date-and-time
+end
+
+; Reports the standard deviation of the population satisfaction (current alternative)
+to-report Variance-Population-Evaluation
+  report variance ([ overall-evaluation] of humats)
+end
+
+; Reports the average evaluation of the current alternative for each agent with
+; current alternative A
+to-report Variance-Sub-Population-Evaluation-With-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report variance ([ overall-evaluation ] of humat-set)
+end
+
+; Reports the average evaluation of the current alternative for each agent with
+; current alternative B
+to-report Variance-Sub-Population-Evaluation-With-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report variance ([ overall-evaluation ] of humat-set)
+end
+
+; report the count of agents in the high satisfaction bracket (0.5, 1.0]
+to-report High-Satisfaction-Count
+  let humat-set humats with [ High-Satisfaction? ]
+  report count humat-set
+end
+
+; report the count of agents in the plus-middle satisfaction bracket (0.0, 0.5]
+to-report Positive-Satisfaction-Count
+  let humat-set humats with [ Positive-Satisfaction? ]
+  report count humat-set
+end
+
+; report the count of agents in the minus-middle satisfaction bracket (-0.5, 0.0]
+to-report Negative-Satisfaction-Count
+  let humat-set humats with [ Negative-Satisfaction? ]
+  report count humat-set
+end
+
+; report the count of agents in the high satisfaction bracket [-1, -0.5)
+to-report Low-Satisfaction-Count
+  let humat-set humats with [ Low-Satisfaction? ]
+  report count humat-set
+end
+
+; Composite status measures
+to-report Fully-Convinced-Count
+  let humat-set humats with [ Fully-Convinced? ]
+  report count humat-set
+end
+
+to-report Almost-Convinced-Count
+  let humat-set humats with [ Almost-Convinced? ]
+  report count humat-set
+end
+
+to-report Partially-Convinced-Count
+  let humat-set humats with [ Partially-Convinced? ]
+  report count humat-set
+end
+
+; Reseeds the random number generator and reports the seed
+to-report Set-And-Report-Seed
+  set global-random-seed new-seed
+  random-seed global-random-seed
+  report global-random-seed
+end
+
+to-report Report-Seed
+  report global-random-seed
+end
+
+; expected satisfaction variances
+; TODO: standardize these names
+
+; Reports the average evaluation of the current alternative for each agent
+to-report Average-Population-Expected-Satisfaction
+  report mean [ Current-Expected-Satisfaction ] of humats
+end
+
+; Reports the average evaluation of the current alternative for each agent with
+; current alternative A
+to-report Average-Sub-Population-Expected-Satisfaction-With-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report mean [ Current-Expected-Satisfaction ] of humat-set 
+end
+
+; Reports the average evaluation of the current alternative for each agent with
+; current alternative B
+to-report Average-Sub-Population-Expected-Satisfaction-With-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report mean [ Current-Expected-Satisfaction ] of humat-set
+end
+
+to-report Variance-Population-Expected-Satisfaction
+  report variance ([ Current-Expected-Satisfaction ] of humats)
+end
+
+to-report Variance-Sub-Population-Expected-Satisfaction-With-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report variance [ Current-Expected-Satisfaction ] of humat-set
+end
+
+to-report Variance-Sub-Population-Expected-Satisfaction-With-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report variance [ Current-Expected-Satisfaction ] of humat-set
+end
+
+; Reporters for communication factors
+to-report Total-Communications
+  report Total-Inquiries + Total-Signals
+end
+
+to-report Total-Inquiries
+  report sum [ #inquiring ] of humats
+end
+
+to-report Total-Signals
+  report sum [ #signaling ] of humats
+end
+
+to-report Average-Communications
+  report mean [ #signaling + #inquiring ] of humats
+end
+
+to-report Average-Signals
+  report mean [ #signaling ] of humats
+end
+
+to-report Average-Inquiries
+  report mean [ #inquiring ] of humats
+end
+
+to-report Variance-Communications
+  report variance [ #signaling + #inquiring ] of humats
+end
+
+to-report Variance-Signals
+  report variance [ #signaling ] of humats
+end
+
+to-report Variance-Inquiries
+  report variance [ #inquiring ] of humats
+end
+
+; group a
+to-report Total-Communications-A
+  report Total-Inquiries-A + Total-Signals-A
+end
+
+to-report Total-Inquiries-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report sum [ #inquiring ] of humat-set
+end
+
+to-report Total-Signals-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report sum [ #signaling ] of humat-set
+end
+
+to-report Average-Communications-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report mean [ #signaling + #inquiring ] of humat-set
+end
+
+to-report Average-Signals-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report mean [ #signaling ] of humat-set
+end
+
+to-report Average-Inquiries-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report mean [ #inquiring ] of humat-set
+end
+
+to-report Variance-Communications-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report variance [ #signaling + #inquiring ] of humat-set
+end
+
+to-report Variance-Signals-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report variance [ #signaling ] of humat-set
+end
+
+to-report Variance-Inquiries-A
+  let humat-set humats with [ current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report variance [ #inquiring ] of humat-set
+end
+
+; group b
+to-report Total-Communications-B
+  report Total-Inquiries-B + Total-Signals-B
+end
+
+to-report Total-Inquiries-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report sum [ #inquiring ] of humat-set
+end
+
+to-report Total-Signals-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report sum [ #signaling ] of humat-set
+end
+
+to-report Average-Communications-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report mean [ #signaling + #inquiring ] of humat-set
+end
+
+to-report Average-Signals-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report mean [ #signaling ] of humat-set
+end
+
+to-report Average-Inquiries-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report mean [ #inquiring ] of humat-set
+end
+
+to-report Variance-Communications-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+ report variance [ #signaling + #inquiring ] of humat-set
+end
+
+to-report Variance-Signals-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report variance [ #signaling ] of humat-set
+end
+
+to-report Variance-Inquiries-B
+  let humat-set humats with [ current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report variance [ #inquiring ] of humat-set
+end
+
+; Group choice state counts A
+; report the count of agents in the high satisfaction bracket (0.5, 1.0]
+to-report High-Satisfaction-Count-A
+  let humat-set humats with [ High-Satisfaction? and current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; report the count of agents in the plus-middle satisfaction bracket (0.0, 0.5]
+to-report Positive-Satisfaction-Count-A
+  let humat-set humats with [ Positive-Satisfaction? and current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; report the count of agents in the minus-middle satisfaction bracket (-0.5, 0.0]
+to-report Negative-Satisfaction-Count-A
+  let humat-set humats with [ Negative-Satisfaction? and current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; report the count of agents in the high satisfaction bracket [-1, -0.5)
+to-report Low-Satisfaction-Count-A
+  let humat-set humats with [ Low-Satisfaction? and current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; Composite status measures
+to-report Fully-Convinced-Count-A
+  let humat-set humats with [ Fully-Convinced? and current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+to-report Almost-Convinced-Count-A
+  let humat-set humats with [ Almost-Convinced? and current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+to-report Partially-Convinced-Count-A
+  let humat-set humats with [ Partially-Convinced? and current-alternative = "A" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; Group choice state counts B
+; report the count of agents in the high satisfaction bracket (0.5, 1.0]
+to-report High-Satisfaction-Count-B
+  let humat-set humats with [ High-Satisfaction? and current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; report the count of agents in the plus-middle satisfaction bracket (0.0, 0.5]
+to-report Positive-Satisfaction-Count-B
+  let humat-set humats with [ Positive-Satisfaction? and current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; report the count of agents in the minus-middle satisfaction bracket (-0.5, 0.0]
+to-report Negative-Satisfaction-Count-B
+  let humat-set humats with [ Negative-Satisfaction? and current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; report the count of agents in the high satisfaction bracket [-1, -0.5)
+to-report Low-Satisfaction-Count-B
+  let humat-set humats with [ Low-Satisfaction? and current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+; Composite status measures
+to-report Fully-Convinced-Count-B
+  let humat-set humats with [ Fully-Convinced? and current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+to-report Almost-Convinced-Count-B
+  let humat-set humats with [ Almost-Convinced? and current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
+
+to-report Partially-Convinced-Count-B
+  let humat-set humats with [ Partially-Convinced? and current-alternative = "B" ]
+  if not any? humat-set [ report 0 ]
+  report count humat-set
+end
